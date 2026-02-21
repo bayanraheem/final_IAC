@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IAC Relief System | مؤسسة الإغاثة الدولية</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- استخدام إصدار محدد من المكتبة لضمان الاستقرار -->
+    <script src="https://unpkg.com/html5-qrcode@4.0.2/html5-qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-/* جميع الأنماط - انسخها من المرفق السابق (نفس الأنماط) */
+/* جميع الأنماط كما هي - لم يتم تغييرها */
 :root {
   --iac-primary: #1b8f4c;
   --iac-dark: #0a4d29;
@@ -392,7 +393,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9T30LSqwWkpVGLnF-i4zO6jUsNLM7nkJo-p5ce75_XQKkXMtnMyjJS4_SO5fD3Ji0Fg/exec"; // ⚠️ استبدل هذا بالرابط الجديد
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9T30LSqwWkpVGLnF-i4zO6jUsNLM7nkJo-p5ce75_XQKkXMtnMyjJS4_SO5fD3Ji0Fg/exec"; // الرابط الخاص بك
 
 const SYSTEM_PASS = "iac2026";
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode;
@@ -408,7 +409,7 @@ const translationMap = {
 function getArName(name) { return translationMap[name.toLowerCase()] || name; }
 function getEnName(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
 
-// دالة الاتصال الموحدة مع API
+// دالة الاتصال الموحدة مع API (كما هي)
 async function callApi(action, params = {}) {
     try {
         const url = new URL(WEB_APP_URL);
@@ -416,7 +417,6 @@ async function callApi(action, params = {}) {
         for (const key in params) {
             url.searchParams.append(key, params[key]);
         }
-        // منع التخزين المؤقت
         url.searchParams.append('nocache', Date.now());
         
         const response = await fetch(url.toString());
@@ -444,14 +444,31 @@ function switchSection(sectionId) {
   document.querySelectorAll('.section-content').forEach(sec => sec.classList.remove('active'));
   document.getElementById(sectionId).classList.add('active');
   toggleSidebar();
-  if (html5QrCode && html5QrCode.getState && html5QrCode.getState() === 2) {
-    try { html5QrCode.stop(); } catch(e) {}
-  }
-  if (queryQrCode && queryQrCode.getState && queryQrCode.getState() === 2) {
-    try { queryQrCode.stop(); } catch(e) {}
-  }
+  stopAllScanners();
+}
+
+// دالة لإيقاف جميع الكاميرات
+function stopAllScanners() {
+  [html5QrCode, loginQrCode, queryQrCode, checkoutQrCode].forEach(scanner => {
+    if (scanner && scanner.getState && scanner.getState() === 2) {
+      try { scanner.stop(); } catch(e) { console.warn('Error stopping scanner', e); }
+    }
+  });
   document.getElementById('reader').style.display = 'none';
   document.getElementById('query-reader').style.display = 'none';
+  document.getElementById('login-qr-reader').style.display = 'none';
+  document.getElementById('checkout-reader').style.display = 'none';
+}
+
+// دالة اختبار الكاميرا (يمكن إضافته مؤقتاً)
+async function testCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    alert('✅ الكاميرا تعمل بشكل طبيعي');
+    stream.getTracks().forEach(track => track.stop());
+  } catch (err) {
+    alert('❌ خطأ في الكاميرا: ' + err.message);
+  }
 }
 
 // --- وظائف تسجيل الدخول ---
@@ -470,14 +487,26 @@ function toggleLoginScanner() {
     readerDiv.style.display = 'none';
     return;
   }
+  // إخفاء أي كاميرا أخرى
+  stopAllScanners();
   readerDiv.style.display = 'block';
+  
   loginQrCode = new Html5Qrcode("login-qr-reader");
-  loginQrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (text) => {
-    loginQrCode.stop();
-    readerDiv.style.display = 'none';
-    processVolunteerLogin(text);
-  }).catch(err => {
-      document.getElementById('login-err').innerText = "خطأ في الكاميرا | Camera Error";
+  loginQrCode.start(
+    { facingMode: "environment" }, 
+    { fps: 10, qrbox: 200 },
+    (text) => {
+      loginQrCode.stop();
+      readerDiv.style.display = 'none';
+      processVolunteerLogin(text);
+    },
+    (error) => {
+      // تجاهل أخطاء المسح المستمرة
+      console.log(error);
+    }
+  ).catch(err => {
+      document.getElementById('login-err').innerText = "خطأ في تشغيل الكاميرا: " + err.message;
+      readerDiv.style.display = 'none';
   });
 }
 
@@ -778,7 +807,7 @@ async function runFinalCheckout(scannedId) {
     }
 }
 
-// --- دوال الكاميرا ---
+// --- دوال الكاميرا المحسّنة ---
 function toggleCheckoutScanner() {
   const readerDiv = document.getElementById('checkout-reader');
   if(readerDiv.style.display === 'block') {
@@ -786,14 +815,23 @@ function toggleCheckoutScanner() {
     readerDiv.style.display = 'none';
     return;
   }
+  stopAllScanners();
   readerDiv.style.display = 'block';
   checkoutQrCode = new Html5Qrcode("checkout-reader");
-  checkoutQrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-    checkoutQrCode.stop();
+  checkoutQrCode.start(
+    { facingMode: "environment" }, 
+    { fps: 10, qrbox: 250 },
+    (text) => {
+      checkoutQrCode.stop();
+      readerDiv.style.display = 'none';
+      document.getElementById('checkoutIdInput').value = text;
+      runFinalCheckout(text);
+    },
+    (error) => { console.log(error); }
+  ).catch(err => {
+    alert("خطأ في تشغيل الكاميرا: " + err.message + "\nتأكد من إعطاء صلاحية الكاميرا للمتصفح.");
     readerDiv.style.display = 'none';
-    document.getElementById('checkoutIdInput').value = text;
-    runFinalCheckout(text);
-  }).catch(err => alert("تأكد من إعطاء صلاحية الكاميرا للمتصفح"));
+  });
 }
 
 function toggleScanner() {
@@ -803,7 +841,7 @@ function toggleScanner() {
     readerDiv.style.display = 'none';
     return;
   }
-
+  stopAllScanners();
   readerDiv.style.display = 'block';
   html5QrCode = new Html5Qrcode("reader");
   
@@ -815,8 +853,12 @@ function toggleScanner() {
       html5QrCode.stop();
       readerDiv.style.display = 'none';
       search();
-    }
-  ).catch(err => alert("تأكد من إعطاء صلاحية الكاميرا للمتصفح"));
+    },
+    (error) => { console.log(error); }
+  ).catch(err => {
+    alert("خطأ في تشغيل الكاميرا: " + err.message + "\nتأكد من إعطاء صلاحية الكاميرا للمتصفح.");
+    readerDiv.style.display = 'none';
+  });
 }
 
 function toggleQueryScanner() {
@@ -826,15 +868,31 @@ function toggleQueryScanner() {
     readerDiv.style.display = 'none';
     return;
   }
+  stopAllScanners();
   readerDiv.style.display = 'block';
   queryQrCode = new Html5Qrcode("query-reader");
-  queryQrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-    queryQrCode.stop();
+  queryQrCode.start(
+    { facingMode: "environment" }, 
+    { fps: 10, qrbox: 250 },
+    (text) => {
+      queryQrCode.stop();
+      readerDiv.style.display = 'none';
+      document.getElementById('idQueryInput').value = text;
+      generalQuery(text);
+    },
+    (error) => { console.log(error); }
+  ).catch(err => {
+    alert("خطأ في تشغيل الكاميرا: " + err.message + "\nتأكد من إعطاء صلاحية الكاميرا للمتصفح.");
     readerDiv.style.display = 'none';
-    document.getElementById('idQueryInput').value = text;
-    generalQuery(text);
-  }).catch(err => alert("تأكد من إعطاء صلاحية الكاميرا للمتصفح"));
+  });
 }
+
+// إضافة دالة لاختبار الكاميرا يدوياً (يمكن استدعاؤها من وحدة التحكم)
+window.testCamera = testCamera;
 </script>
+<!-- زر مؤقت لاختبار الكاميرا (يمكن إزالته لاحقاً) -->
+<div style="position:fixed; bottom:10px; left:10px; z-index:9999;">
+  <button onclick="testCamera()" style="background:orange; border:none; border-radius:5px; padding:5px;">🔧 اختبار الكاميرا</button>
+</div>
 </body>
 </html>
