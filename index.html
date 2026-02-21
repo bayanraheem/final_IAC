@@ -4,11 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IAC Relief System | مؤسسة الإغاثة الدولية</title>
-    <!-- استخدام إصدار محدد من المكتبة لضمان الاستقرار -->
-    <script src="https://unpkg.com/html5-qrcode@4.0.2/html5-qrcode.min.js"></script>
+    <!-- محاولة تحميل المكتبة من عدة مصادر -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@4.0.2/html5-qrcode.min.js"></script>
+    <!-- بديل في حالة فشل التحميل -->
+    <script>
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'SCRIPT' && e.target.src.includes('html5-qrcode')) {
+                console.warn('فشل تحميل المكتبة من CDN، جاري التحميل من مصدر آخر');
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/html5-qrcode@4.0.2/html5-qrcode.min.js';
+                document.head.appendChild(script);
+            }
+        }, true);
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-/* جميع الأنماط كما هي - لم يتم تغييرها */
+/* جميع الأنماط كما هي */
 :root {
   --iac-primary: #1b8f4c;
   --iac-dark: #0a4d29;
@@ -393,7 +404,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9T30LSqwWkpVGLnF-i4zO6jUsNLM7nkJo-p5ce75_XQKkXMtnMyjJS4_SO5fD3Ji0Fg/exec"; // الرابط الخاص بك
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9T30LSqwWkpVGLnF-i4zO6jUsNLM7nkJo-p5ce75_XQKkXMtnMyjJS4_SO5fD3Ji0Fg/exec";
 
 const SYSTEM_PASS = "iac2026";
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode;
@@ -409,7 +420,7 @@ const translationMap = {
 function getArName(name) { return translationMap[name.toLowerCase()] || name; }
 function getEnName(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
 
-// دالة الاتصال الموحدة مع API (كما هي)
+// دالة الاتصال الموحدة مع API
 async function callApi(action, params = {}) {
     try {
         const url = new URL(WEB_APP_URL);
@@ -460,7 +471,7 @@ function stopAllScanners() {
   document.getElementById('checkout-reader').style.display = 'none';
 }
 
-// دالة اختبار الكاميرا (يمكن إضافته مؤقتاً)
+// دالة اختبار الكاميرا (للتصحيح)
 async function testCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -487,7 +498,11 @@ function toggleLoginScanner() {
     readerDiv.style.display = 'none';
     return;
   }
-  // إخفاء أي كاميرا أخرى
+  // التحقق من تحميل المكتبة
+  if (typeof Html5Qrcode === 'undefined') {
+    alert('مكتبة المسح لم يتم تحميلها بعد. حاول مرة أخرى أو راجع اتصال الإنترنت.');
+    return;
+  }
   stopAllScanners();
   readerDiv.style.display = 'block';
   
@@ -807,12 +822,16 @@ async function runFinalCheckout(scannedId) {
     }
 }
 
-// --- دوال الكاميرا المحسّنة ---
+// --- دوال الكاميرا المحسّنة مع التحقق من المكتبة ---
 function toggleCheckoutScanner() {
   const readerDiv = document.getElementById('checkout-reader');
   if(readerDiv.style.display === 'block') {
     if(checkoutQrCode) { try { checkoutQrCode.stop(); } catch(e) {} }
     readerDiv.style.display = 'none';
+    return;
+  }
+  if (typeof Html5Qrcode === 'undefined') {
+    alert('مكتبة المسح لم يتم تحميلها بعد. حاول تحديث الصفحة.');
     return;
   }
   stopAllScanners();
@@ -839,6 +858,10 @@ function toggleScanner() {
   if (readerDiv.style.display === 'block') {
     if(html5QrCode) { try { html5QrCode.stop(); } catch(e) {} }
     readerDiv.style.display = 'none';
+    return;
+  }
+  if (typeof Html5Qrcode === 'undefined') {
+    alert('مكتبة المسح لم يتم تحميلها بعد. حاول تحديث الصفحة.');
     return;
   }
   stopAllScanners();
@@ -868,6 +891,10 @@ function toggleQueryScanner() {
     readerDiv.style.display = 'none';
     return;
   }
+  if (typeof Html5Qrcode === 'undefined') {
+    alert('مكتبة المسح لم يتم تحميلها بعد. حاول تحديث الصفحة.');
+    return;
+  }
   stopAllScanners();
   readerDiv.style.display = 'block';
   queryQrCode = new Html5Qrcode("query-reader");
@@ -887,13 +914,12 @@ function toggleQueryScanner() {
   });
 }
 
-// إضافة دالة لاختبار الكاميرا يدوياً (يمكن استدعاؤها من وحدة التحكم)
+// إتاحة دالة الاختبار عالمياً
 window.testCamera = testCamera;
 </script>
-<!-- زر مؤقت لاختبار الكاميرا (يمكن إزالته لاحقاً) -->
+<!-- زر مؤقت لاختبار الكاميرا -->
 <div style="position:fixed; bottom:10px; left:10px; z-index:9999;">
   <button onclick="testCamera()" style="background:orange; border:none; border-radius:5px; padding:5px;">🔧 اختبار الكاميرا</button>
 </div>
 </body>
 </html>
-
