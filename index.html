@@ -483,30 +483,18 @@ function login() {
 function toggleLoginScanner() {
   const readerDiv = document.getElementById('login-qr-reader');
   if(readerDiv.style.display === 'block') {
-    if(loginQrCode) { try { loginQrCode.stop(); } catch(e) {} }
+    if(loginQrCode) loginQrCode.stop();
     readerDiv.style.display = 'none';
     return;
   }
-  // إخفاء أي كاميرا أخرى
-  stopAllScanners();
   readerDiv.style.display = 'block';
-  
   loginQrCode = new Html5Qrcode("login-qr-reader");
-  loginQrCode.start(
-    { facingMode: "environment" }, 
-    { fps: 10, qrbox: 200 },
-    (text) => {
-      loginQrCode.stop();
-      readerDiv.style.display = 'none';
-      processVolunteerLogin(text);
-    },
-    (error) => {
-      // تجاهل أخطاء المسح المستمرة
-      console.log(error);
-    }
-  ).catch(err => {
-      document.getElementById('login-err').innerText = "خطأ في تشغيل الكاميرا: " + err.message;
-      readerDiv.style.display = 'none';
+  loginQrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (text) => {
+    loginQrCode.stop();
+    readerDiv.style.display = 'none';
+    processVolunteerLogin(text);
+  }).catch(err => {
+      document.getElementById('login-err').innerText = "خطأ في الكاميرا | Camera Error";
   });
 }
 
@@ -896,4 +884,5 @@ window.testCamera = testCamera;
 </div>
 </body>
 </html>
+
 
