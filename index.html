@@ -460,16 +460,7 @@ function stopAllScanners() {
   document.getElementById('checkout-reader').style.display = 'none';
 }
 
-// دالة اختبار الكاميرا (يمكن إضافته مؤقتاً)
-async function testCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    alert('✅ الكاميرا تعمل بشكل طبيعي');
-    stream.getTracks().forEach(track => track.stop());
-  } catch (err) {
-    alert('❌ خطأ في الكاميرا: ' + err.message);
-  }
-}
+
 
 // --- وظائف تسجيل الدخول ---
 function login() {
@@ -875,15 +866,10 @@ function toggleQueryScanner() {
   });
 }
 
-// إضافة دالة لاختبار الكاميرا يدوياً (يمكن استدعاؤها من وحدة التحكم)
-window.testCamera = testCamera;
 </script>
-<!-- زر مؤقت لاختبار الكاميرا (يمكن إزالته لاحقاً) -->
-<div style="position:fixed; bottom:10px; left:10px; z-index:9999;">
-  <button onclick="testCamera()" style="background:orange; border:none; border-radius:5px; padding:5px;">🔧 اختبار الكاميرا</button>
-</div>
 </body>
 </html>
+
 
 
 
