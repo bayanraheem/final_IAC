@@ -314,6 +314,8 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
           </div>
         </div>
 
+         <div id="deliver-all-placeholder" style="width:100%; max-width:600px; margin:0 auto; padding:10px 0;"></div>
+
         <div class="panel" style="margin-top: 15px;">
           <div class="panel-header">قائمة المخصصات | Items Entitlement</div>
           <div id="items-result" class="panel-body">
@@ -393,7 +395,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9T30LSqwWkpVGLnF-i4zO6jUsNLM7nkJo-p5ce75_XQKkXMtnMyjJS4_SO5fD3Ji0Fg/exec"; // الرابط الخاص بك
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwjY5Q_0XXv8k246QlKZHhzBFqTtGvSEc7d9bwMVdhZeXaqVsJnYcjm3Uue-xY_brjfGA/exec"; // الرابط الخاص بك
 
 const SYSTEM_PASS = "iac2026";
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode;
@@ -533,6 +535,11 @@ async function search() {
 function renderResult(res) {
   const bContainer = document.getElementById('beneficiary-result');
   const iContainer = document.getElementById('items-result');
+  const placeholder = document.getElementById('deliver-all-placeholder');
+
+  // تنظيف الـ placeholder
+  if (placeholder) placeholder.innerHTML = '';
+
   if(!res || res.status === "not_found") {
     bContainer.innerHTML = "<div style='color:red; text-align:center'>❌ غير موجود | ID Not Found</div>";
     iContainer.innerHTML = "";
@@ -558,6 +565,38 @@ function renderResult(res) {
     return;
   }
 
+  // إنشاء زر تسليم الكل إذا كان هناك مواد ووضعه في الـ placeholder
+  if (placeholder && Object.keys(res.items).length > 0) {
+    // فحص ما إذا كانت جميع المواد قد تم تسليمها
+    const allDelivered = Object.values(res.items).every(item => item.isDelivered === true);
+    
+    if (allDelivered) {
+      // عرض رسالة بدلاً من الزر
+      const msgContainer = document.createElement('div');
+      msgContainer.id = 'deliver-all-msg';
+      msgContainer.style.padding = '15px';
+      msgContainer.style.margin = '10px 0';
+      msgContainer.style.backgroundColor = '#eef7f2';
+      msgContainer.style.color = 'var(--iac-primary)';
+      msgContainer.style.borderRadius = '12px';
+      msgContainer.style.textAlign = 'center';
+      msgContainer.style.fontWeight = '800';
+      msgContainer.style.border = '2px solid var(--iac-primary)';
+      msgContainer.innerHTML = '✅ تم تسليم جميع المخصصات | All items delivered';
+      placeholder.appendChild(msgContainer);
+    } else {
+      // إنشاء زر تسليم الكل
+      const btnContainer = document.createElement('div');
+      btnContainer.id = 'deliver-all-btn-container';
+      const btn = document.createElement('button');
+      btn.className = 'btn-action btn-search';
+      btn.innerHTML = 'تسليم الكل | Deliver All';
+      btn.onclick = deliverAll;
+      btnContainer.appendChild(btn);
+      placeholder.appendChild(btnContainer);
+    }
+  }
+
   let itemsHtml="";
   for(const [name,info] of Object.entries(res.items)){
     let action = info.isDelivered ? "<span style='color:green; font-weight:800; font-size:12px'>✔ تم التسليم | Done</span>" : 
@@ -577,7 +616,7 @@ function renderResult(res) {
   }
   iContainer.innerHTML = itemsHtml;
 }
-
+    
 async function deliverItem(name, qty, colIdx) {
   if(!confirm(`تأكيد تسليم: ${getArName(name)}؟ \n Confirm delivery of ${name}?`)) return;
   const id = document.getElementById('idInput').value;
@@ -586,6 +625,30 @@ async function deliverItem(name, qty, colIdx) {
   search();
 }
 
+
+async function deliverAll() {
+  const id = document.getElementById('idInput').value;
+  const day = document.getElementById('dayInput').value;
+  if (!id || !day) return alert("يرجى إدخال ID واليوم | Enter ID & Day");
+
+  if (!confirm("هل أنت متأكد من تسليم جميع المواد لهذا المستفيد؟\nConfirm delivery of all items?")) return;
+
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "جاري التسليم... | Delivering...";
+  btn.disabled = true;
+
+  const res = await callApi("deliverAll", { id, day });
+
+  if (res.status === "success") {
+    alert(`تم تسليم ${res.updated} مادة بنجاح | ${res.updated} items delivered`);
+    search(); // تحديث القائمة
+  } else {
+    alert("خطأ: " + res.message);
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
 // --- وظائف الإحصاء العام ---
 async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
@@ -869,7 +932,6 @@ function toggleQueryScanner() {
 </script>
 </body>
 </html>
-
 
 
 
