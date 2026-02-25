@@ -240,6 +240,21 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
   font-size: 13px;
   border: 1px solid var(--iac-primary);
 }
+/* زر حفظ التعديلات أصغر ومتمركز */
+.admin-save-btn {
+  width: auto;
+  min-width: 150px;
+  margin: 15px auto;
+  padding: 10px 20px;
+  background: var(--iac-primary);
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-weight: 800;
+  cursor: pointer;
+  display: block;
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -290,10 +305,12 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <div class="sidebar-item" onclick="switchSection('distribution-sec')">📍 توزيع اليوم | Daily Distribution</div>
     <div class="sidebar-item" onclick="switchSection('query-sec')">🔍 استعلام شامل | General Inquiry</div>
     <div class="sidebar-item" onclick="switchSection('report-sec')">📊 تقرير اليوم | Daily Report</div>
-    <div class="sidebar-item" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📈 إحصاء عام | Global Analytics</div>
+    <div class="sidebar-item" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📈 إحصاء عام (عام)</div>
     <div class="sidebar-item" onclick="switchSection('checkout-sec')">✅ تحقق الخروج | Final Checkout</div>
-    <!-- عنصر الإدارة الجديد -->
+    <!-- عنصر الإدارة (يظهر للمسؤول فقط) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
+    <!-- عنصر الإحصاء العام التفصيلي (يظهر للمسؤول فقط) -->
+    <div class="sidebar-item" id="admin-stats-menu-item" style="display:none;" onclick="switchSection('admin-stats-sec'); loadAdminStats();">📊 إحصاء عام (تفصيلي)</div>
   </div>
 
   <div class="header-bar">
@@ -309,6 +326,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
   <div class="main-layout">
     
+    <!-- قسم توزيع اليوم -->
     <div id="distribution-sec" class="section-content active">
         <div class="panel">
           <div class="panel-header">البحث والتحقق | Search & Verify</div>
@@ -344,6 +362,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
         </div>
     </div>
 
+    <!-- قسم الاستعلام الشامل -->
     <div id="query-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">استعلام شامل | General Inquiry</div>
@@ -358,6 +377,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
       <div id="query-results-container" style="width: 100%; max-width: 600px; padding: 15px 0;"></div>
     </div>
 
+    <!-- قسم تقرير اليوم -->
     <div id="report-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">تقرير المستفيدين اليومي | Daily Report</div>
@@ -384,20 +404,34 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
       <div id="report-list" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
     </div>
 
+    <!-- قسم الإحصاء العام (العادي) -->
     <div id="global-stats-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">الإحصاء التراكمي الشامل | Global Analytics</div>
         <div class="panel-body">
            <div style="text-align:center; font-size:12px; color:#7f8c8d; margin-bottom:15px;">ملخص كامل لجميع أيام التوزيع | Full Summary of All Distribution Days</div>
-           <div id="global-main-stats" class="stats-grid">
-              </div>
+           <div id="global-main-stats" class="stats-grid"></div>
         </div>
       </div>
-      <div id="global-days-list" style="width: 100%; max-width: 600px; margin-top: 20px;">
-         </div>
+      <div id="global-days-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
     </div>
 
-    <!-- قسم الإدارة -->
+    <!-- قسم تحقق الخروج -->
+    <div id="checkout-sec" class="section-content">
+      <div class="panel">
+        <div class="panel-header">تحقق الخروج النهائي | Final Exit Check</div>
+        <div class="panel-body">
+          <label>مسح أو إدخال ID | Scan or Enter ID</label>
+          <input type="text" id="checkoutIdInput" placeholder="DAM00000">
+          <button class="btn-action btn-search" onclick="runFinalCheckout()">✅ تحقق من الاستلام | Verify All</button>
+          <button class="btn-action btn-scan" onclick="toggleCheckoutScanner()">📷 مسح الباركود | Scan QR</button>
+          <div id="checkout-reader" style="margin-top:10px; display:none; border-radius: 15px; overflow: hidden;"></div>
+        </div>
+      </div>
+      <div id="checkout-result-container" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
+    </div>
+
+    <!-- قسم إدارة العائلات (للمسؤول فقط) -->
     <div id="admin-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">🔍 إدارة العائلات | Families Management</div>
@@ -415,34 +449,47 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
         <div class="panel">
           <div class="panel-header">📋 تفاصيل العائلة | Family Details</div>
           <div class="panel-body" id="admin-details-content"></div>
-          <button class="btn-action btn-search" onclick="adminUpdate()" style="margin: 15px;">💾 حفظ التعديلات | Save Changes</button>
-          <button class="btn-action btn-scan" onclick="adminCancel()">❌ إلغاء | Cancel</button>
+          <button class="admin-save-btn" onclick="adminUpdate()">💾 حفظ التعديلات</button>
+          <button class="btn-action btn-scan" onclick="adminCancel()" style="margin-top: 0;">❌ إلغاء</button>
         </div>
       </div>
     </div>
-  </div>
-  <div id="checkout-sec" class="section-content">
-  <div class="panel">
-    <div class="panel-header">تحقق الخروج النهائي | Final Exit Check</div>
-    <div class="panel-body">
-      <label>مسح أو إدخال ID | Scan or Enter ID</label>
-      <input type="text" id="checkoutIdInput" placeholder="DAM00000">
-      <button class="btn-action btn-search" onclick="runFinalCheckout()">✅ تحقق من الاستلام | Verify All</button>
-      <button class="btn-action btn-scan" onclick="toggleCheckoutScanner()">📷 مسح الباركود | Scan QR</button>
-      <div id="checkout-reader" style="margin-top:10px; display:none; border-radius: 15px; overflow: hidden;"></div>
+
+    <!-- قسم الإحصاء العام التفصيلي (للمسؤول فقط) -->
+    <div id="admin-stats-sec" class="section-content">
+      <div class="panel">
+        <div class="panel-header">إحصاء المواد التفصيلي | Detailed Items Stats</div>
+        <div class="panel-body">
+          <!-- البطاقة الإجمالية -->
+          <div id="overall-stats-card" class="admin-card" onclick="showOverallItems()" style="cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:800; font-size:18px; color:var(--iac-dark);">📦 إجمالي المواد | Overall Items</span>
+              <span style="color:#7f8c8d;">انقر للتفاصيل | Click for details</span>
+            </div>
+          </div>
+          <!-- قائمة الأيام -->
+          <div id="admin-stats-days-list" style="margin-top:20px;"></div>
+        </div>
+      </div>
+      <!-- نافذة تفاصيل المواد -->
+      <div id="admin-stats-details" style="display:none; margin-top:15px;">
+        <div class="panel">
+          <div class="panel-header" id="admin-stats-details-title">تفاصيل المواد</div>
+          <div class="panel-body" id="admin-stats-details-content"></div>
+          <button class="btn-action btn-scan" onclick="document.getElementById('admin-stats-details').style.display='none';">❌ إغلاق</button>
+        </div>
+      </div>
     </div>
-  </div>
-  <div id="checkout-result-container" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
   </div>
 </div>
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzZYwKNvbR3s5yCJduR4Oq-0NZErwYocB0-rakQCFyHGOUwHiJ03BtsWCaSdCUDAdlm/exec"; // الرابط الخاص بك
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0NWRV_87wTQ3Ej2Zye0zCYNOXLzNlRmC26ZzfEARgBILGl1HyrROkZ8oYn8nahDOhtA/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
-let loginType = "normal"; // "normal" or "admin"
+let loginType = "normal";
 let currentAdminId = null;
 let currentAdminData = null;
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode, adminQrCode;
@@ -493,10 +540,6 @@ function switchSection(sectionId) {
   document.getElementById(sectionId).classList.add('active');
   toggleSidebar();
   stopAllScanners();
-  if (sectionId === 'admin-sec') {
-    document.getElementById('admin-results').innerHTML = '';
-    document.getElementById('admin-details').style.display = 'none';
-  }
 }
 
 function stopAllScanners() {
@@ -518,10 +561,12 @@ function login() {
   if(enteredPass === ADMIN_PASS) {
     loginType = "admin";
     document.getElementById('admin-menu-item').style.display = 'block';
+    document.getElementById('admin-stats-menu-item').style.display = 'block';
     showMainApp();
   } else if(enteredPass === SYSTEM_PASS) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
+    document.getElementById('admin-stats-menu-item').style.display = 'none';
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -552,6 +597,7 @@ async function processVolunteerLogin(scannedId) {
   if(res.status === "success") {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
+    document.getElementById('admin-stats-menu-item').style.display = 'none';
     showWelcome(res);
   } else {
     document.getElementById('login-err').innerText = "غير مصرح لك بالدخول | Access Denied";
@@ -577,7 +623,7 @@ function showMainApp() {
   document.getElementById('main-app').style.display = 'flex';
 }
 
-// --- وظائف التوزيع (بدون تغيير) ---
+// --- وظائف التوزيع ---
 async function search() {
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
@@ -701,7 +747,7 @@ async function deliverAll() {
   }
 }
 
-// --- وظائف الإحصاء العام ---
+// --- وظائف الإحصاء العام (العادي) ---
 async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
   const daysListDiv = document.getElementById('global-days-list');
@@ -901,7 +947,7 @@ async function runFinalCheckout(scannedId) {
     }
 }
 
-// --- دوال الكاميرا الموجودة ---
+// --- دوال الكاميرا ---
 function toggleCheckoutScanner() {
   const readerDiv = document.getElementById('checkout-reader');
   if(readerDiv.style.display === 'block') {
@@ -981,9 +1027,7 @@ function toggleQueryScanner() {
   });
 }
 
-// ========== دوال الإدارة الجديدة ==========
-
-// كاميرا للإدارة
+// ========== دوال الإدارة (إدارة العائلات) ==========
 function toggleAdminScanner() {
   const readerDiv = document.getElementById('admin-reader');
   if(readerDiv.style.display === 'block') {
@@ -1002,7 +1046,7 @@ function toggleAdminScanner() {
       adminQrCode.stop();
       readerDiv.style.display = 'none';
       document.getElementById('adminSearchInput').value = text;
-      adminSearch(); // نبحث مباشرة بعد المسح
+      adminSearch();
     },
     (error) => { console.log(error); }
   ).catch(err => {
@@ -1011,7 +1055,6 @@ function toggleAdminScanner() {
   });
 }
 
-// البحث (تم تعديله ليرسل النص فقط، والخلفية هي من تبحث في كل الأعمدة)
 async function adminSearch() {
   const query = document.getElementById('adminSearchInput').value;
   if (!query) return alert("الرجاء إدخال نص للبحث");
@@ -1046,7 +1089,6 @@ async function adminSearch() {
   }
 }
 
-// تحميل تفاصيل عائلة معينة (مع عرض QR كرابط)
 async function adminLoadDetails(id) {
   const detailsDiv = document.getElementById('admin-details');
   const contentDiv = document.getElementById('admin-details-content');
@@ -1059,7 +1101,6 @@ async function adminLoadDetails(id) {
     currentAdminId = id;
     currentAdminData = res.details;
     
-    // عرض حقل QR بشكل مميز: إذا كان رابط صورة، نعرض صورة مصغرة، وإلا نعرض الرابط كنص قابل للنقر
     let qrDisplay = res.details.qr || '';
     if (qrDisplay.startsWith('http')) {
       qrDisplay = `<a href="${qrDisplay}" target="_blank" class="qr-link">🔗 عرض QR</a>`;
@@ -1110,7 +1151,6 @@ async function adminLoadDetails(id) {
   }
 }
 
-// حفظ التعديلات
 async function adminUpdate() {
   if (!currentAdminId) return;
   
@@ -1146,8 +1186,8 @@ async function adminUpdate() {
   
   if (res.status === "success") {
     alert("تم التحديث بنجاح | Updated successfully");
-    adminSearch(); // إعادة تحميل النتائج
-    adminCancel(); // إخفاء التفاصيل
+    adminSearch();
+    adminCancel();
   } else {
     alert("خطأ: " + res.message);
   }
@@ -1159,6 +1199,93 @@ function adminCancel() {
   currentAdminData = null;
 }
 
+// ========== دوال الإحصاء العام التفصيلي للمسؤول ==========
+async function loadAdminStats() {
+  const daysListDiv = document.getElementById('admin-stats-days-list');
+  daysListDiv.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري تحميل البيانات...</div>`;
+  
+  const res = await callApi("getGlobalAnalytics", {});
+  if (res.status === "success" && res.daysDetails) {
+    let html = "";
+    res.daysDetails.forEach(dayInfo => {
+      html += `
+        <div class="admin-card" onclick="showDayItems('${dayInfo.day}')">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:800; color:var(--iac-dark);">اليوم | Day ${dayInfo.day}</span>
+            <span style="color:#7f8c8d;">انقر للتفاصيل</span>
+          </div>
+          <div style="font-size:12px; color:#555; margin-top:5px;">
+            إجمالي المستفيدين: ${dayInfo.total} | المستلمين: ${dayInfo.received}
+          </div>
+        </div>`;
+    });
+    daysListDiv.innerHTML = html;
+  } else {
+    daysListDiv.innerHTML = `<div style='color:red;'>خطأ في تحميل البيانات</div>`;
+  }
+}
+
+async function showDayItems(day) {
+  const detailsDiv = document.getElementById('admin-stats-details');
+  const title = document.getElementById('admin-stats-details-title');
+  const content = document.getElementById('admin-stats-details-content');
+  
+  title.innerText = `تفاصيل المواد لليوم | Day ${day}`;
+  content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
+  detailsDiv.style.display = 'block';
+
+  const res = await callApi("getDailyItemsSummary", { day });
+  if (res.status === "success") {
+    let itemsHtml = "";
+    for (const [item, qty] of Object.entries(res.items)) {
+      itemsHtml += `
+        <div class="item-row" style="border-right-color: #3498db;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="item-qty-box" style="background:#d4e6f1; color:#2875a7;">${qty}</div>
+            <div class="item-info-wrapper">
+              <span class="item-name-ar">${getArName(item)}</span>
+              <span class="item-name-en">${getEnName(item)}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+    if (itemsHtml === "") itemsHtml = "<div style='text-align:center; color:#999;'>لا توجد مواد مسجلة لهذا اليوم</div>";
+    content.innerHTML = itemsHtml;
+  } else {
+    content.innerHTML = `<div style='color:red;'>خطأ: ${res.message}</div>`;
+  }
+}
+
+async function showOverallItems() {
+  const detailsDiv = document.getElementById('admin-stats-details');
+  const title = document.getElementById('admin-stats-details-title');
+  const content = document.getElementById('admin-stats-details-content');
+  
+  title.innerText = `إجمالي المواد (كل الأيام)`;
+  content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
+  detailsDiv.style.display = 'block';
+
+  const res = await callApi("getOverallItemsSummary", {});
+  if (res.status === "success") {
+    let itemsHtml = "";
+    for (const [item, qty] of Object.entries(res.items)) {
+      itemsHtml += `
+        <div class="item-row" style="border-right-color: #9b59b6;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="item-qty-box" style="background:#e8daef; color:#8e44ad;">${qty}</div>
+            <div class="item-info-wrapper">
+              <span class="item-name-ar">${getArName(item)}</span>
+              <span class="item-name-en">${getEnName(item)}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+    if (itemsHtml === "") itemsHtml = "<div style='text-align:center; color:#999;'>لا توجد مواد مسجلة</div>";
+    content.innerHTML = itemsHtml;
+  } else {
+    content.innerHTML = `<div style='color:red;'>خطأ: ${res.message}</div>`;
+  }
+}
 </script>
 </body>
 </html>
