@@ -465,7 +465,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0NWRV_87wTQ3Ej2Zye0zCYNOXLzNlRmC26ZzfEARgBILGl1HyrROkZ8oYn8nahDOhtA/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzKvtAWGaTzDBCfvd_uciF8FnKG4xqKunAge9S-jBsV1DQ-g0Q7fGGzGCfTV8fW5blqw/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
@@ -913,6 +913,7 @@ function toggleQueryScanner() {
   });
 }
 
+// ========== دوال الإدارة (إدارة العائلات) ==========
 function toggleAdminScanner() {
   const readerDiv = document.getElementById('admin-reader');
   if(readerDiv.style.display === 'block') {
@@ -1083,6 +1084,7 @@ function adminCancel() {
   currentAdminId = null;
   currentAdminData = null;
 }
+
 // ========== دوال الإحصاء العام (مع تفاصيل المواد) ==========
 async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
