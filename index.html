@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IAC Relief System | مؤسسة الإغاثة الدولية</title>
-    <!-- استخدام إصدار محدد من المكتبة لضمان الاستقرار -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-/* جميع الأنماط كما هي - تم إضافة أنماط للإدارة فقط */
 :root {
   --iac-primary: #1b8f4c;
   --iac-dark: #0a4d29;
@@ -231,6 +229,17 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 .admin-field { margin-bottom: 12px; }
 .admin-field label { font-size: 11px; color: #7f8c8d; margin-bottom: 2px; }
 .admin-field input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+.qr-link {
+  display: inline-block;
+  background: #eef7f2;
+  color: var(--iac-primary);
+  padding: 5px 12px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid var(--iac-primary);
+}
 </style>
 </head>
 <body>
@@ -283,7 +292,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <div class="sidebar-item" onclick="switchSection('report-sec')">📊 تقرير اليوم | Daily Report</div>
     <div class="sidebar-item" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📈 إحصاء عام | Global Analytics</div>
     <div class="sidebar-item" onclick="switchSection('checkout-sec')">✅ تحقق الخروج | Final Checkout</div>
-    <!-- عنصر الإدارة الجديد - يظهر فقط عند الدخول بكلمة المرور 1222003 -->
+    <!-- عنصر الإدارة الجديد -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
   </div>
 
@@ -388,14 +397,17 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
          </div>
     </div>
 
-    <!-- قسم الإدارة الجديد -->
+    <!-- قسم الإدارة -->
     <div id="admin-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">🔍 إدارة العائلات | Families Management</div>
         <div class="panel-body">
-          <label>بحث بالاسم أو ID | Search by Name or ID</label>
-          <input type="text" id="adminSearchInput" placeholder="DAM00000 أو اسم">
-          <button class="btn-action btn-search" onclick="adminSearch()">🔍 بحث | Search</button>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="adminSearchInput" placeholder="ابحث بأي شيء... ID، اسم، هاتف، QR" style="flex:1;">
+            <button class="btn-action btn-search" onclick="adminSearch()" style="width: auto; padding: 10px 20px;">بحث</button>
+            <button class="btn-action btn-scan" onclick="toggleAdminScanner()" style="width: auto; padding: 10px 20px;">📷</button>
+          </div>
+          <div id="admin-reader" style="margin-top:10px; display:none; border-radius: 15px; overflow: hidden;"></div>
         </div>
       </div>
       <div id="admin-results" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
@@ -426,14 +438,14 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxkUu4N8odaEMGXduuSJxi_tqYzJtG1g565D_K-sLwEpdxJ-QZnpBueD0t9gIznxDe9Sw/exec"; // الرابط الخاص بك
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzZYwKNvbR3s5yCJduR4Oq-0NZErwYocB0-rakQCFyHGOUwHiJ03BtsWCaSdCUDAdlm/exec"; // الرابط الخاص بك
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
 let loginType = "normal"; // "normal" or "admin"
-let currentAdminId = null; // لتخزين ID العائلة التي يتم تعديلها حالياً
-let currentAdminData = null; // لتخزين بيانات التفاصيل الحالية (بما فيها row)
-let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode;
+let currentAdminId = null;
+let currentAdminData = null;
+let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode, adminQrCode;
 
 const translationMap = {
   'vegetables (eggplant)':'خضار (باذنجان)', 'vegetables(tomato)':'خضار (بندورة)','vegetables( potato)':'خضار (بطاطا)',
@@ -446,7 +458,6 @@ const translationMap = {
 function getArName(name) { return translationMap[name.toLowerCase()] || name; }
 function getEnName(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
 
-// دالة الاتصال الموحدة مع API
 async function callApi(action, params = {}) {
     try {
         const url = new URL(WEB_APP_URL);
@@ -483,15 +494,13 @@ function switchSection(sectionId) {
   toggleSidebar();
   stopAllScanners();
   if (sectionId === 'admin-sec') {
-    // تنظيف نتائج البحث السابقة
     document.getElementById('admin-results').innerHTML = '';
     document.getElementById('admin-details').style.display = 'none';
   }
 }
 
-// دالة لإيقاف جميع الكاميرات
 function stopAllScanners() {
-  [html5QrCode, loginQrCode, queryQrCode, checkoutQrCode].forEach(scanner => {
+  [html5QrCode, loginQrCode, queryQrCode, checkoutQrCode, adminQrCode].forEach(scanner => {
     if (scanner && scanner.getState && scanner.getState() === 2) {
       try { scanner.stop(); } catch(e) { console.warn('Error stopping scanner', e); }
     }
@@ -500,6 +509,7 @@ function stopAllScanners() {
   document.getElementById('query-reader').style.display = 'none';
   document.getElementById('login-qr-reader').style.display = 'none';
   document.getElementById('checkout-reader').style.display = 'none';
+  document.getElementById('admin-reader').style.display = 'none';
 }
 
 // --- وظائف تسجيل الدخول ---
@@ -507,11 +517,11 @@ function login() {
   const enteredPass = document.getElementById('passInput').value;
   if(enteredPass === ADMIN_PASS) {
     loginType = "admin";
-    document.getElementById('admin-menu-item').style.display = 'block'; // إظهار عنصر الإدارة
+    document.getElementById('admin-menu-item').style.display = 'block';
     showMainApp();
   } else if(enteredPass === SYSTEM_PASS) {
     loginType = "normal";
-    document.getElementById('admin-menu-item').style.display = 'none'; // إخفاء عنصر الإدارة
+    document.getElementById('admin-menu-item').style.display = 'none';
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -540,7 +550,6 @@ async function processVolunteerLogin(scannedId) {
   document.getElementById('login-err').innerText = "جاري التحقق... Checking...";
   const res = await callApi("verifyVolunteer", { qrId: scannedId });
   if(res.status === "success") {
-    // الدخول عبر QR يعطي صلاحية عادية (ليس إدارياً)
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
     showWelcome(res);
@@ -568,7 +577,7 @@ function showMainApp() {
   document.getElementById('main-app').style.display = 'flex';
 }
 
-// --- وظائف التوزيع ---
+// --- وظائف التوزيع (بدون تغيير) ---
 async function search() {
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
@@ -585,7 +594,6 @@ function renderResult(res) {
   const iContainer = document.getElementById('items-result');
   const placeholder = document.getElementById('deliver-all-placeholder');
 
-  // تنظيف الـ placeholder
   if (placeholder) placeholder.innerHTML = '';
 
   if(!res || res.status === "not_found") {
@@ -613,13 +621,10 @@ function renderResult(res) {
     return;
   }
 
-  // إنشاء زر تسليم الكل إذا كان هناك مواد ووضعه في الـ placeholder
   if (placeholder && Object.keys(res.items).length > 0) {
-    // فحص ما إذا كانت جميع المواد قد تم تسليمها
     const allDelivered = Object.values(res.items).every(item => item.isDelivered === true);
     
     if (allDelivered) {
-      // عرض رسالة بدلاً من الزر
       const msgContainer = document.createElement('div');
       msgContainer.id = 'deliver-all-msg';
       msgContainer.style.padding = '15px';
@@ -633,7 +638,6 @@ function renderResult(res) {
       msgContainer.innerHTML = '✅ تم تسليم جميع المخصصات | All items delivered';
       placeholder.appendChild(msgContainer);
     } else {
-      // إنشاء زر تسليم الكل
       const btnContainer = document.createElement('div');
       btnContainer.id = 'deliver-all-btn-container';
       const btn = document.createElement('button');
@@ -673,7 +677,6 @@ async function deliverItem(name, qty, colIdx) {
   search();
 }
 
-
 async function deliverAll() {
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
@@ -690,13 +693,14 @@ async function deliverAll() {
 
   if (res.status === "success") {
     alert(`تم تسليم ${res.updated} مادة بنجاح | ${res.updated} items delivered`);
-    search(); // تحديث القائمة
+    search();
   } else {
     alert("خطأ: " + res.message);
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
 }
+
 // --- وظائف الإحصاء العام ---
 async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
@@ -897,7 +901,7 @@ async function runFinalCheckout(scannedId) {
     }
 }
 
-// --- دوال الكاميرا المحسّنة ---
+// --- دوال الكاميرا الموجودة ---
 function toggleCheckoutScanner() {
   const readerDiv = document.getElementById('checkout-reader');
   if(readerDiv.style.display === 'block') {
@@ -979,7 +983,35 @@ function toggleQueryScanner() {
 
 // ========== دوال الإدارة الجديدة ==========
 
-// البحث في Families
+// كاميرا للإدارة
+function toggleAdminScanner() {
+  const readerDiv = document.getElementById('admin-reader');
+  if(readerDiv.style.display === 'block') {
+    if(adminQrCode) { try { adminQrCode.stop(); } catch(e) {} }
+    readerDiv.style.display = 'none';
+    return;
+  }
+  stopAllScanners();
+  readerDiv.style.display = 'block';
+  adminQrCode = new Html5Qrcode("admin-reader");
+  
+  adminQrCode.start(
+    { facingMode: "environment" }, 
+    { fps: 10, qrbox: 250 },
+    (text) => {
+      adminQrCode.stop();
+      readerDiv.style.display = 'none';
+      document.getElementById('adminSearchInput').value = text;
+      adminSearch(); // نبحث مباشرة بعد المسح
+    },
+    (error) => { console.log(error); }
+  ).catch(err => {
+    alert("خطأ في تشغيل الكاميرا: " + err.message + "\nتأكد من إعطاء صلاحية الكاميرا للمتصفح.");
+    readerDiv.style.display = 'none';
+  });
+}
+
+// البحث (تم تعديله ليرسل النص فقط، والخلفية هي من تبحث في كل الأعمدة)
 async function adminSearch() {
   const query = document.getElementById('adminSearchInput').value;
   if (!query) return alert("الرجاء إدخال نص للبحث");
@@ -1014,7 +1046,7 @@ async function adminSearch() {
   }
 }
 
-// تحميل تفاصيل عائلة معينة
+// تحميل تفاصيل عائلة معينة (مع عرض QR كرابط)
 async function adminLoadDetails(id) {
   const detailsDiv = document.getElementById('admin-details');
   const contentDiv = document.getElementById('admin-details-content');
@@ -1025,9 +1057,16 @@ async function adminLoadDetails(id) {
   
   if (res.status === "success") {
     currentAdminId = id;
-    currentAdminData = res.details; // نحفظ البيانات كاملة
+    currentAdminData = res.details;
     
-    // بناء حقول الإدخال
+    // عرض حقل QR بشكل مميز: إذا كان رابط صورة، نعرض صورة مصغرة، وإلا نعرض الرابط كنص قابل للنقر
+    let qrDisplay = res.details.qr || '';
+    if (qrDisplay.startsWith('http')) {
+      qrDisplay = `<a href="${qrDisplay}" target="_blank" class="qr-link">🔗 عرض QR</a>`;
+    } else {
+      qrDisplay = `<span style="background:#f0f0f0; padding:4px 10px; border-radius:8px; font-family:monospace;">${qrDisplay}</span>`;
+    }
+    
     let fieldsHtml = `
       <div class="admin-field">
         <label>ID (العمود A)</label>
@@ -1047,7 +1086,10 @@ async function adminLoadDetails(id) {
       </div>
       <div class="admin-field">
         <label>QR (العمود E)</label>
-        <input type="text" id="admin-field-qr" value="${res.details.qr || ''}">
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="admin-field-qr" value="${res.details.qr || ''}" style="flex:1;">
+          <span>${qrDisplay}</span>
+        </div>
       </div>
       <div class="admin-field">
         <label>العمود F</label>
@@ -1072,7 +1114,6 @@ async function adminLoadDetails(id) {
 async function adminUpdate() {
   if (!currentAdminId) return;
   
-  // جمع التحديثات
   const updates = {};
   const fields = [
     { id: 'admin-field-name', key: 'name' },
@@ -1088,31 +1129,25 @@ async function adminUpdate() {
     const el = document.getElementById(f.id);
     if (el) {
       const val = el.value;
-      // إذا كانت القيمة مختلفة عن القيمة الأصلية (اختياري) نضيفها
       if (val !== currentAdminData[f.key]) {
         updates[f.key] = val;
       }
     }
   });
   
-  // لا نسمح بتعديل ID
-  // إذا لم يكن هناك أي تغيير
   if (Object.keys(updates).length === 0) {
     alert("لم تقم بأي تعديل | No changes made");
     return;
   }
   
-  // تأكيد
   if (!confirm("هل أنت متأكد من حفظ التعديلات؟")) return;
   
   const res = await callApi("updateFamily", { id: currentAdminId, updates: JSON.stringify(updates) });
   
   if (res.status === "success") {
     alert("تم التحديث بنجاح | Updated successfully");
-    // إعادة تحميل نتائج البحث
-    adminSearch();
-    // إخفاء التفاصيل
-    adminCancel();
+    adminSearch(); // إعادة تحميل النتائج
+    adminCancel(); // إخفاء التفاصيل
   } else {
     alert("خطأ: " + res.message);
   }
