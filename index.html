@@ -281,18 +281,6 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
   font-size: 18px;
   margin: 0 10px;
 }
-/* مؤشر تحميل صغير */
-.spinner {
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid var(--iac-primary);
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-  margin-right: 5px;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -348,7 +336,6 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <!-- الأقسام الإضافية (تظهر فقط للمسؤول) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
     <div class="sidebar-item" id="stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام | Global Statistics</div>
-    <div class="sidebar-item" id="report-menu-item" style="display:none;" onclick="switchSection('report-sec')">📋 تقرير اليوم | Daily Report</div>
   </div>
 
   <div class="header-bar">
@@ -430,33 +417,6 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
       <div id="checkout-result-container" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
     </div>
 
-    <!-- قسم تقرير اليوم (للمسؤول فقط) -->
-    <div id="report-sec" class="section-content">
-      <div class="panel">
-        <div class="panel-header">تقرير المستفيدين اليومي | Daily Report</div>
-        <div class="panel-body">
-          <label>أدخل رقم اليوم | Enter Day Number</label>
-          <input type="number" id="reportDayInput" placeholder="1">
-          <button class="btn-action btn-search" onclick="loadDailyReport()">📊 عرض التقرير | View Report</button>
-        </div>
-      </div>
-      <div id="report-stats" class="stats-grid" style="display:none; margin-top: 15px;">
-        <div class="stat-card" style="border-bottom-color: var(--iac-primary);">
-          <span id="stat-total" class="stat-val">0</span>
-          <span class="stat-lbl">الكلي | Total</span>
-        </div>
-        <div class="stat-card" style="border-bottom-color: #2ecc71;">
-          <span id="stat-rec" class="stat-val">0</span>
-          <span class="stat-lbl">استلم | Received</span>
-        </div>
-        <div class="stat-card" style="border-bottom-color: #e74c3c;">
-          <span id="stat-not" class="stat-val">0</span>
-          <span class="stat-lbl">متبقي | Pending</span>
-        </div>
-      </div>
-      <div id="report-list" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
-    </div>
-
     <!-- قسم إدارة العائلات (للمسؤول فقط) -->
     <div id="admin-sec" class="section-content">
       <div class="panel">
@@ -505,7 +465,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyHQEYdBmV6IcXOsdtcRdl4EWHz2r-KAAVDd3QimV_4YLNboi99LGGTJ7mXt7Pv2gyU/exec"; // حدّث الرابط
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyHQEYdBmV6IcXOsdtcRdl4EWHz2r-KAAVDd3QimV_4YLNboi99LGGTJ7mXt7Pv2gyU/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
@@ -513,9 +473,6 @@ let loginType = "normal";
 let currentAdminId = null;
 let currentAdminData = null;
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode, adminQrCode;
-
-// متغيرات لتخزين بيانات التوزيع الحالية لتسريع العمليات
-let currentEntitlementData = null; // سيحوي res من getEntitlement
 
 const translationMap = {
   'vegetables (eggplant)':'خضار (باذنجان)', 'vegetables(tomato)':'خضار (بندورة)','vegetables( potato)':'خضار (بطاطا)',
@@ -528,12 +485,8 @@ const translationMap = {
 function getArName(name) { return translationMap[name.toLowerCase()] || name; }
 function getEnName(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
 
-// دالة محسنة للاتصال مع timeout ومعالجة أخطاء HTTP
 async function callApi(action, params = {}) {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 ثانية مهلة
-        
         const url = new URL(WEB_APP_URL);
         url.searchParams.append('action', action);
         for (const key in params) {
@@ -541,26 +494,8 @@ async function callApi(action, params = {}) {
         }
         url.searchParams.append('nocache', Date.now());
         
-        const response = await fetch(url.toString(), {
-            signal: controller.signal,
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            console.error('HTTP error:', response.status);
-            throw new Error(`HTTP error ${response.status}`);
-        }
-        
+        const response = await fetch(url.toString());
         const text = await response.text();
-        if (!text || text.trim() === '') {
-            throw new Error('استجابة فارغة من الخادم');
-        }
-        
         try {
             return JSON.parse(text);
         } catch (e) {
@@ -569,13 +504,9 @@ async function callApi(action, params = {}) {
             return { status: "error", message: "Invalid JSON" };
         }
     } catch (err) {
-        if (err.name === 'AbortError') {
-            alert('انتهت مهلة الاتصال بالخادم. تأكد من الاتصال.');
-            return { status: "error", message: "Request timeout" };
-        }
         console.error("API Error:", err);
-        alert("فشل الاتصال بالخادم: " + err.message);
-        return { status: "error", message: "Connection failed: " + err.message };
+        alert("فشل الاتصال بالخادم. تأكد من جودة الإنترنت.");
+        return { status: "error", message: "Connection failed" };
     }
 }
 
@@ -611,13 +542,11 @@ function login() {
     loginType = "admin";
     document.getElementById('admin-menu-item').style.display = 'block';
     document.getElementById('stats-menu-item').style.display = 'block';
-    document.getElementById('report-menu-item').style.display = 'block';
     showMainApp();
   } else if(enteredPass === SYSTEM_PASS) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
     document.getElementById('stats-menu-item').style.display = 'none';
-    document.getElementById('report-menu-item').style.display = 'none';
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -649,7 +578,6 @@ async function processVolunteerLogin(scannedId) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
     document.getElementById('stats-menu-item').style.display = 'none';
-    document.getElementById('report-menu-item').style.display = 'none';
     showWelcome(res);
   } else {
     document.getElementById('login-err').innerText = "غير مصرح لك بالدخول | Access Denied";
@@ -675,20 +603,15 @@ function showMainApp() {
   document.getElementById('main-app').style.display = 'flex';
 }
 
-// --- وظائف التوزيع (محسنة للأداء) ---
+// --- وظائف التوزيع (كما هي) ---
 async function search() {
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
   if(!id || !day) return alert("يرجى إدخال ID واليوم | Enter ID & Day");
-  
-  // عرض مؤشر تحميل
-  document.getElementById('beneficiary-result').innerHTML = '<div style="text-align:center"><span class="spinner"></span> جاري التحميل...</div>';
-  document.getElementById('items-result').innerHTML = '<div style="text-align:center"><span class="spinner"></span> جاري جلب القائمة...</div>';
+  document.getElementById('beneficiary-result').innerHTML = "جاري التحميل... | Loading...";
+  document.getElementById('items-result').innerHTML = "جاري جلب القائمة... | Fetching list...";
   
   const res = await callApi("getEntitlement", { id, day });
-  if (res.status === "success") {
-    currentEntitlementData = res; // تخزين البيانات
-  }
   renderResult(res);
 }
 
@@ -702,7 +625,6 @@ function renderResult(res) {
   if(!res || res.status === "not_found") {
     bContainer.innerHTML = "<div style='color:red; text-align:center'>❌ غير موجود | ID Not Found</div>";
     iContainer.innerHTML = "";
-    currentEntitlementData = null;
     return;
   }
   const isActive = (res.status === "success");
@@ -722,44 +644,44 @@ function renderResult(res) {
 
   if(!isActive) {
     iContainer.innerHTML = `<div style="text-align:center; color:#e74c3c; padding:20px">لا يوجد مخصصات اليوم | No items today</div>`;
-    currentEntitlementData = null;
     return;
   }
 
-  // التحقق مما إذا كان جميع المواد مسلمة
-  const allDelivered = Object.values(res.items).every(item => item.isDelivered === true);
-  
-  if (allDelivered) {
-    const msgContainer = document.createElement('div');
-    msgContainer.id = 'deliver-all-msg';
-    msgContainer.style.padding = '15px';
-    msgContainer.style.margin = '10px 0';
-    msgContainer.style.backgroundColor = '#eef7f2';
-    msgContainer.style.color = 'var(--iac-primary)';
-    msgContainer.style.borderRadius = '12px';
-    msgContainer.style.textAlign = 'center';
-    msgContainer.style.fontWeight = '800';
-    msgContainer.style.border = '2px solid var(--iac-primary)';
-    msgContainer.innerHTML = '✅ تم تسليم جميع المخصصات | All items delivered';
-    placeholder.appendChild(msgContainer);
-  } else {
-    const btnContainer = document.createElement('div');
-    btnContainer.id = 'deliver-all-btn-container';
-    const btn = document.createElement('button');
-    btn.className = 'btn-action btn-search';
-    btn.innerHTML = 'تسليم الكل | Deliver All';
-    btn.onclick = deliverAll;
-    btnContainer.appendChild(btn);
-    placeholder.appendChild(btnContainer);
+  if (placeholder && Object.keys(res.items).length > 0) {
+    const allDelivered = Object.values(res.items).every(item => item.isDelivered === true);
+    
+    if (allDelivered) {
+      const msgContainer = document.createElement('div');
+      msgContainer.id = 'deliver-all-msg';
+      msgContainer.style.padding = '15px';
+      msgContainer.style.margin = '10px 0';
+      msgContainer.style.backgroundColor = '#eef7f2';
+      msgContainer.style.color = 'var(--iac-primary)';
+      msgContainer.style.borderRadius = '12px';
+      msgContainer.style.textAlign = 'center';
+      msgContainer.style.fontWeight = '800';
+      msgContainer.style.border = '2px solid var(--iac-primary)';
+      msgContainer.innerHTML = '✅ تم تسليم جميع المخصصات | All items delivered';
+      placeholder.appendChild(msgContainer);
+    } else {
+      const btnContainer = document.createElement('div');
+      btnContainer.id = 'deliver-all-btn-container';
+      const btn = document.createElement('button');
+      btn.className = 'btn-action btn-search';
+      btn.innerHTML = 'تسليم الكل | Deliver All';
+      btn.onclick = deliverAll;
+      btnContainer.appendChild(btn);
+      placeholder.appendChild(btnContainer);
+    }
   }
 
   let itemsHtml="";
   for(const [name,info] of Object.entries(res.items)){
     let action = info.isDelivered ? "<span style='color:green; font-weight:800; font-size:12px'>✔ تم التسليم | Done</span>" : 
-                 (info.qty > 0 ? `<button class='deliver-btn' onclick="deliverItem('${name}',${info.qty},${info.colIndex}, this)">تسليم | Give</button>` : "-");
+                 (info.qty > 0 ? `<button class='deliver-btn' onclick="deliverItem('${name}',${info.qty},${info.colIndex})">تسليم | Give</button>` : "-");
     
     itemsHtml += `
-      <div class="item-row" data-item="${name}">
+      <div class="item-row">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="item-qty-box">${info.qty || 0}</div>
           <div class="item-info-wrapper">
@@ -773,65 +695,12 @@ function renderResult(res) {
   iContainer.innerHTML = itemsHtml;
 }
     
-async function deliverItem(name, qty, colIdx, btnElement) {
+async function deliverItem(name, qty, colIdx) {
   if(!confirm(`تأكيد تسليم: ${getArName(name)}؟ \n Confirm delivery of ${name}?`)) return;
-  
-  // تعطيل الزر وإظهار مؤشر تحميل
-  const originalText = btnElement.innerText;
-  btnElement.innerText = '...';
-  btnElement.disabled = true;
-  
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
-  
-  const res = await callApi("saveDelivery", { id, day, colIdx, qty });
-  
-  if (res && (res === "تم التسليم بنجاح / Delivered Successfully" || res.status === "success")) {
-    // تحديث الواجهة مباشرة
-    const itemRow = btnElement.closest('.item-row');
-    if (itemRow) {
-      const actionCell = itemRow.querySelector('div:last-child');
-      actionCell.innerHTML = "<span style='color:green; font-weight:800; font-size:12px'>✔ تم التسليم | Done</span>";
-    }
-    // تحديث البيانات المخزنة
-    if (currentEntitlementData && currentEntitlementData.items && currentEntitlementData.items[name]) {
-      currentEntitlementData.items[name].isDelivered = true;
-    }
-    // التحقق من حالة "الكل مسلم" وتحديث زر تسليم الكل إذا لزم الأمر
-    updateDeliverAllButton();
-  } else {
-    alert("فشل التسليم: " + (res.message || 'خطأ غير معروف'));
-    btnElement.innerText = originalText;
-    btnElement.disabled = false;
-  }
-}
-
-// دالة مساعدة لتحديث حالة زر تسليم الكل
-function updateDeliverAllButton() {
-  if (!currentEntitlementData) return;
-  const allDelivered = Object.values(currentEntitlementData.items).every(item => item.isDelivered === true);
-  const placeholder = document.getElementById('deliver-all-placeholder');
-  if (!placeholder) return;
-  
-  if (allDelivered) {
-    placeholder.innerHTML = `
-      <div style="padding:15px; margin:10px 0; background:#eef7f2; color:var(--iac-primary); border-radius:12px; text-align:center; font-weight:800; border:2px solid var(--iac-primary);">
-        ✅ تم تسليم جميع المخصصات | All items delivered
-      </div>`;
-  } else {
-    // إذا كان الزر غير موجود، نعيد إنشاؤه
-    if (!placeholder.querySelector('button')) {
-      placeholder.innerHTML = '';
-      const btnContainer = document.createElement('div');
-      btnContainer.id = 'deliver-all-btn-container';
-      const btn = document.createElement('button');
-      btn.className = 'btn-action btn-search';
-      btn.innerHTML = 'تسليم الكل | Deliver All';
-      btn.onclick = deliverAll;
-      btnContainer.appendChild(btn);
-      placeholder.appendChild(btnContainer);
-    }
-  }
+  await callApi("saveDelivery", { id, day, colIdx, qty });
+  search();
 }
 
 async function deliverAll() {
@@ -843,32 +712,14 @@ async function deliverAll() {
 
   const btn = event.target;
   const originalText = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> جاري التسليم...';
+  btn.innerHTML = "جاري التسليم... | Delivering...";
   btn.disabled = true;
 
   const res = await callApi("deliverAll", { id, day });
 
   if (res.status === "success") {
-    // تحديث جميع العناصر في الواجهة
-    document.querySelectorAll('.item-row').forEach(row => {
-      const actionCell = row.querySelector('div:last-child');
-      actionCell.innerHTML = "<span style='color:green; font-weight:800; font-size:12px'>✔ تم التسليم | Done</span>";
-    });
-    // تحديث البيانات المخزنة
-    if (currentEntitlementData && currentEntitlementData.items) {
-      Object.keys(currentEntitlementData.items).forEach(key => {
-        currentEntitlementData.items[key].isDelivered = true;
-      });
-    }
-    // تحديث رسالة "الكل مسلم"
-    const placeholder = document.getElementById('deliver-all-placeholder');
-    if (placeholder) {
-      placeholder.innerHTML = `
-        <div style="padding:15px; margin:10px 0; background:#eef7f2; color:var(--iac-primary); border-radius:12px; text-align:center; font-weight:800; border:2px solid var(--iac-primary);">
-          ✅ تم تسليم جميع المخصصات | All items delivered
-        </div>`;
-    }
     alert(`تم تسليم ${res.updated} مادة بنجاح | ${res.updated} items delivered`);
+    search();
   } else {
     alert("خطأ: " + res.message);
     btn.innerHTML = originalText;
@@ -876,12 +727,12 @@ async function deliverAll() {
   }
 }
 
-// --- استعلام شامل (بدون تغيير) ---
+// --- استعلام شامل ---
 async function generalQuery(scannedId) {
   const id = scannedId || document.getElementById('idQueryInput').value;
   if(!id) return alert("يرجى إدخال ID / Please enter ID");
   const container = document.getElementById('query-results-container');
-  container.innerHTML = `<div style='text-align:center; padding:20px;'><span class="spinner"></span> جاري البحث...</div>`;
+  container.innerHTML = `<div style='text-align:center; padding:20px; color:var(--iac-dark);'>جاري البحث... | Searching...</div>`;
 
   const res = await callApi("getGeneralStatus", { id });
   if(res.status === "success") {
@@ -919,49 +770,6 @@ async function generalQuery(scannedId) {
     }
 }
 
-// --- تقرير يومي ---
-async function loadDailyReport() {
-  const day = document.getElementById('reportDayInput').value;
-  if(!day) return alert("يرجى إدخال رقم اليوم | Please enter day");
-  const listContainer = document.getElementById('report-list');
-  const statsDiv = document.getElementById('report-stats');
-  listContainer.innerHTML = "<div style='text-align:center; padding:20px;'><span class='spinner'></span> جاري معالجة البيانات...</div>";
-  statsDiv.style.display = 'none';
-
-  const res = await callApi("getDailyReport", { day });
-  if(res.status === "success") {
-      document.getElementById('stat-total').innerText = res.total;
-      document.getElementById('stat-rec').innerText = res.received;
-      document.getElementById('stat-not').innerText = res.notReceived;
-      statsDiv.style.display = 'grid';
-      if(res.list.length === 0) {
-        listContainer.innerHTML = "<div class='status-card' style='text-align:center'>لا يوجد مسجلين لهذا اليوم | No data</div>";
-        return;
-      }
-      let html = "";
-      res.list.forEach(item => {
-        const isRec = item.status;
-        html += `
-          <div class="status-card ${isRec ? 'delivered' : 'pending'}" style="padding: 12px; margin-bottom: 8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div style="text-align:right">
-                <div style="font-weight:800; color:var(--iac-dark); font-size:15px;">${item.name}</div>
-                <div style="font-size:11px; color:#7f8c8d;">ID: ${item.id}</div>
-              </div>
-              <div>
-                <span class="tag" style="background:${isRec?'#eef7f2':'#fff5f5'}; color:${isRec?'#1b8f4c':'#e74c3c'}; border:none; padding:5px 12px;">
-                  ${isRec ? 'استلم | Received' : 'لم يستلم | Pending'}
-                </span>
-              </div>
-            </div>
-          </div>`;
-      });
-      listContainer.innerHTML = html;
-    } else {
-      listContainer.innerHTML = "<div style='color:red;'>حدث خطأ</div>";
-    }
-}
-
 // --- تحقق الخروج النهائي ---
 async function runFinalCheckout(scannedId) {
   const id = scannedId || document.getElementById('checkoutIdInput').value;
@@ -970,7 +778,7 @@ async function runFinalCheckout(scannedId) {
   const container = document.getElementById('checkout-result-container');
   container.innerHTML = `
     <div style="text-align:center; padding:30px; color:#666;">
-      <span class="spinner"></span> جاري التحقق من البيانات...<br>
+      ⏳ جاري التحقق من البيانات...<br>
       Verifying records...
     </div>`;
 
@@ -1025,7 +833,7 @@ async function runFinalCheckout(scannedId) {
     }
 }
 
-// --- دوال الكاميرا (كما هي، مع إضافة مؤشرات تحميل) ---
+// --- دوال الكاميرا ---
 function toggleCheckoutScanner() {
   const readerDiv = document.getElementById('checkout-reader');
   if(readerDiv.style.display === 'block') {
@@ -1105,7 +913,7 @@ function toggleQueryScanner() {
   });
 }
 
-// ========== دوال الإدارة (إدارة العائلات) (بدون تغيير) ==========
+// ========== دوال الإدارة (إدارة العائلات) ==========
 function toggleAdminScanner() {
   const readerDiv = document.getElementById('admin-reader');
   if(readerDiv.style.display === 'block') {
@@ -1138,7 +946,7 @@ async function adminSearch() {
   if (!query) return alert("الرجاء إدخال نص للبحث");
   
   const resultsDiv = document.getElementById('admin-results');
-  resultsDiv.innerHTML = `<div style='text-align:center; padding:20px;'><span class="spinner"></span> جاري البحث...</div>`;
+  resultsDiv.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري البحث... | Searching...</div>`;
   
   const res = await callApi("searchFamilies", { q: query });
   
@@ -1171,7 +979,7 @@ async function adminLoadDetails(id) {
   const detailsDiv = document.getElementById('admin-details');
   const contentDiv = document.getElementById('admin-details-content');
   detailsDiv.style.display = 'block';
-  contentDiv.innerHTML = `<div style='text-align:center; padding:20px;'><span class="spinner"></span> جاري تحميل التفاصيل...</div>`;
+  contentDiv.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري تحميل التفاصيل... | Loading details...</div>`;
   
   const res = await callApi("getFamilyDetails", { id });
   
@@ -1260,11 +1068,6 @@ async function adminUpdate() {
   
   if (!confirm("هل أنت متأكد من حفظ التعديلات؟")) return;
   
-  const btn = event.target;
-  const originalText = btn.innerText;
-  btn.innerText = 'جاري الحفظ...';
-  btn.disabled = true;
-  
   const res = await callApi("updateFamily", { id: currentAdminId, updates: JSON.stringify(updates) });
   
   if (res.status === "success") {
@@ -1273,8 +1076,6 @@ async function adminUpdate() {
     adminCancel();
   } else {
     alert("خطأ: " + res.message);
-    btn.innerText = originalText;
-    btn.disabled = false;
   }
 }
 
@@ -1289,7 +1090,7 @@ async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
   const daysListDiv = document.getElementById('global-days-list');
   
-  mainStatsDiv.innerHTML = "<div style='grid-column: span 3; padding:20px; text-align:center;'><span class='spinner'></span> جاري قراءة البيانات...</div>";
+  mainStatsDiv.innerHTML = "<div style='grid-column: span 3; padding:20px; text-align:center;'>⏳ جاري قراءة البيانات...<br>Fetching from Delivered logs...</div>";
   daysListDiv.innerHTML = "";
 
   const res = await callApi("getGlobalAnalytics", {});
@@ -1341,7 +1142,7 @@ async function showDayItems(day) {
   const content = document.getElementById('stats-details-content');
   
   title.innerText = `تفاصيل المواد لليوم | Day ${day}`;
-  content.innerHTML = `<div style='text-align:center; padding:20px;'><span class="spinner"></span> جاري التحميل...</div>`;
+  content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
   detailsDiv.style.display = 'block';
 
   const res = await callApi("getDailyItemsSummary", { day });
@@ -1372,7 +1173,7 @@ async function showOverallItems() {
   const content = document.getElementById('stats-details-content');
   
   title.innerText = `إجمالي المواد (كل الأيام)`;
-  content.innerHTML = `<div style='text-align:center; padding:20px;'><span class="spinner"></span> جاري التحميل...</div>`;
+  content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
   detailsDiv.style.display = 'block';
 
   const res = await callApi("getOverallItemsSummary", {});
@@ -1399,4 +1200,3 @@ async function showOverallItems() {
 </script>
 </body>
 </html>
-
