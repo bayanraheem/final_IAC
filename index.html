@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-/* جميع الأنماط كما هي - لم يتم تغييرها */
+/* جميع الأنماط كما هي - تم إضافة أنماط للإدارة فقط */
 :root {
   --iac-primary: #1b8f4c;
   --iac-dark: #0a4d29;
@@ -222,6 +222,15 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 .stat-card { background: white; padding: 10px; border-radius: 15px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-bottom: 4px solid #ddd; }
 .stat-val { display: block; font-size: 20px; font-weight: 800; color: var(--iac-dark); }
 .stat-lbl { display: block; font-size: 9px; color: #7f8c8d; font-weight: 700; }
+/* أنماط للإدارة */
+.admin-card {
+  background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-right: 5px solid var(--iac-primary);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s;
+}
+.admin-card:hover { background: #f0f8f3; transform: translateY(-2px); }
+.admin-field { margin-bottom: 12px; }
+.admin-field label { font-size: 11px; color: #7f8c8d; margin-bottom: 2px; }
+.admin-field input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -274,6 +283,8 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <div class="sidebar-item" onclick="switchSection('report-sec')">📊 تقرير اليوم | Daily Report</div>
     <div class="sidebar-item" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📈 إحصاء عام | Global Analytics</div>
     <div class="sidebar-item" onclick="switchSection('checkout-sec')">✅ تحقق الخروج | Final Checkout</div>
+    <!-- عنصر الإدارة الجديد - يظهر فقط عند الدخول بكلمة المرور 1222003 -->
+    <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
   </div>
 
   <div class="header-bar">
@@ -377,6 +388,26 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
          </div>
     </div>
 
+    <!-- قسم الإدارة الجديد -->
+    <div id="admin-sec" class="section-content">
+      <div class="panel">
+        <div class="panel-header">🔍 إدارة العائلات | Families Management</div>
+        <div class="panel-body">
+          <label>بحث بالاسم أو ID | Search by Name or ID</label>
+          <input type="text" id="adminSearchInput" placeholder="DAM00000 أو اسم">
+          <button class="btn-action btn-search" onclick="adminSearch()">🔍 بحث | Search</button>
+        </div>
+      </div>
+      <div id="admin-results" style="width: 100%; max-width: 600px; margin-top: 15px;"></div>
+      <div id="admin-details" style="width: 100%; max-width: 600px; margin-top: 15px; display: none;">
+        <div class="panel">
+          <div class="panel-header">📋 تفاصيل العائلة | Family Details</div>
+          <div class="panel-body" id="admin-details-content"></div>
+          <button class="btn-action btn-search" onclick="adminUpdate()" style="margin: 15px;">💾 حفظ التعديلات | Save Changes</button>
+          <button class="btn-action btn-scan" onclick="adminCancel()">❌ إلغاء | Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="checkout-sec" class="section-content">
   <div class="panel">
@@ -395,9 +426,13 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxD0t-fyOxtJ8DPlmW6U7UaoijpILUBKha6GBUs8dHfb2LUwvIsADVnUoOt7ddMDvNYWg/exec"; // الرابط الخاص بك
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxkUu4N8odaEMGXduuSJxi_tqYzJtG1g565D_K-sLwEpdxJ-QZnpBueD0t9gIznxDe9Sw/exec"; // الرابط الخاص بك
 
 const SYSTEM_PASS = "iac2026";
+const ADMIN_PASS = "1222003";
+let loginType = "normal"; // "normal" or "admin"
+let currentAdminId = null; // لتخزين ID العائلة التي يتم تعديلها حالياً
+let currentAdminData = null; // لتخزين بيانات التفاصيل الحالية (بما فيها row)
 let html5QrCode, loginQrCode, queryQrCode, checkoutQrCode;
 
 const translationMap = {
@@ -411,7 +446,7 @@ const translationMap = {
 function getArName(name) { return translationMap[name.toLowerCase()] || name; }
 function getEnName(name) { return name.charAt(0).toUpperCase() + name.slice(1); }
 
-// دالة الاتصال الموحدة مع API (كما هي)
+// دالة الاتصال الموحدة مع API
 async function callApi(action, params = {}) {
     try {
         const url = new URL(WEB_APP_URL);
@@ -447,6 +482,11 @@ function switchSection(sectionId) {
   document.getElementById(sectionId).classList.add('active');
   toggleSidebar();
   stopAllScanners();
+  if (sectionId === 'admin-sec') {
+    // تنظيف نتائج البحث السابقة
+    document.getElementById('admin-results').innerHTML = '';
+    document.getElementById('admin-details').style.display = 'none';
+  }
 }
 
 // دالة لإيقاف جميع الكاميرات
@@ -462,11 +502,16 @@ function stopAllScanners() {
   document.getElementById('checkout-reader').style.display = 'none';
 }
 
-
-
 // --- وظائف تسجيل الدخول ---
 function login() {
-  if(document.getElementById('passInput').value === SYSTEM_PASS) {
+  const enteredPass = document.getElementById('passInput').value;
+  if(enteredPass === ADMIN_PASS) {
+    loginType = "admin";
+    document.getElementById('admin-menu-item').style.display = 'block'; // إظهار عنصر الإدارة
+    showMainApp();
+  } else if(enteredPass === SYSTEM_PASS) {
+    loginType = "normal";
+    document.getElementById('admin-menu-item').style.display = 'none'; // إخفاء عنصر الإدارة
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -495,6 +540,9 @@ async function processVolunteerLogin(scannedId) {
   document.getElementById('login-err').innerText = "جاري التحقق... Checking...";
   const res = await callApi("verifyVolunteer", { qrId: scannedId });
   if(res.status === "success") {
+    // الدخول عبر QR يعطي صلاحية عادية (ليس إدارياً)
+    loginType = "normal";
+    document.getElementById('admin-menu-item').style.display = 'none';
     showWelcome(res);
   } else {
     document.getElementById('login-err').innerText = "غير مصرح لك بالدخول | Access Denied";
@@ -929,15 +977,153 @@ function toggleQueryScanner() {
   });
 }
 
+// ========== دوال الإدارة الجديدة ==========
+
+// البحث في Families
+async function adminSearch() {
+  const query = document.getElementById('adminSearchInput').value;
+  if (!query) return alert("الرجاء إدخال نص للبحث");
+  
+  const resultsDiv = document.getElementById('admin-results');
+  resultsDiv.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري البحث... | Searching...</div>`;
+  
+  const res = await callApi("searchFamilies", { q: query });
+  
+  if (res.status === "success") {
+    if (res.results.length === 0) {
+      resultsDiv.innerHTML = `<div class='status-card' style='text-align:center;'>لا توجد نتائج | No results found</div>`;
+      return;
+    }
+    
+    let html = "";
+    res.results.forEach(item => {
+      html += `
+        <div class="admin-card" onclick="adminLoadDetails('${item.id}')">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-weight:800; color:var(--iac-primary);">${item.id}</span>
+              <span style="margin-right:15px; font-weight:700;">${item.name}</span>
+            </div>
+            <span style="color:#7f8c8d; font-size:12px;">انقر للتفاصيل | Click for details</span>
+          </div>
+        </div>`;
+    });
+    resultsDiv.innerHTML = html;
+  } else {
+    resultsDiv.innerHTML = `<div style='color:red;'>خطأ: ${res.message}</div>`;
+  }
+}
+
+// تحميل تفاصيل عائلة معينة
+async function adminLoadDetails(id) {
+  const detailsDiv = document.getElementById('admin-details');
+  const contentDiv = document.getElementById('admin-details-content');
+  detailsDiv.style.display = 'block';
+  contentDiv.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري تحميل التفاصيل... | Loading details...</div>`;
+  
+  const res = await callApi("getFamilyDetails", { id });
+  
+  if (res.status === "success") {
+    currentAdminId = id;
+    currentAdminData = res.details; // نحفظ البيانات كاملة
+    
+    // بناء حقول الإدخال
+    let fieldsHtml = `
+      <div class="admin-field">
+        <label>ID (العمود A)</label>
+        <input type="text" id="admin-field-id" value="${res.details.id || ''}" readonly>
+      </div>
+      <div class="admin-field">
+        <label>الاسم (العمود B)</label>
+        <input type="text" id="admin-field-name" value="${res.details.name || ''}">
+      </div>
+      <div class="admin-field">
+        <label>العمود C</label>
+        <input type="text" id="admin-field-colC" value="${res.details.colC || ''}">
+      </div>
+      <div class="admin-field">
+        <label>العمود D</label>
+        <input type="text" id="admin-field-colD" value="${res.details.colD || ''}">
+      </div>
+      <div class="admin-field">
+        <label>QR (العمود E)</label>
+        <input type="text" id="admin-field-qr" value="${res.details.qr || ''}">
+      </div>
+      <div class="admin-field">
+        <label>العمود F</label>
+        <input type="text" id="admin-field-colF" value="${res.details.colF || ''}">
+      </div>
+      <div class="admin-field">
+        <label>العمود G</label>
+        <input type="text" id="admin-field-colG" value="${res.details.colG || ''}">
+      </div>
+      <div class="admin-field">
+        <label>العمود J</label>
+        <input type="text" id="admin-field-colJ" value="${res.details.colJ || ''}">
+      </div>
+    `;
+    contentDiv.innerHTML = fieldsHtml;
+  } else {
+    contentDiv.innerHTML = `<div style='color:red;'>خطأ: ${res.message}</div>`;
+  }
+}
+
+// حفظ التعديلات
+async function adminUpdate() {
+  if (!currentAdminId) return;
+  
+  // جمع التحديثات
+  const updates = {};
+  const fields = [
+    { id: 'admin-field-name', key: 'name' },
+    { id: 'admin-field-colC', key: 'colC' },
+    { id: 'admin-field-colD', key: 'colD' },
+    { id: 'admin-field-qr', key: 'qr' },
+    { id: 'admin-field-colF', key: 'colF' },
+    { id: 'admin-field-colG', key: 'colG' },
+    { id: 'admin-field-colJ', key: 'colJ' }
+  ];
+  
+  fields.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (el) {
+      const val = el.value;
+      // إذا كانت القيمة مختلفة عن القيمة الأصلية (اختياري) نضيفها
+      if (val !== currentAdminData[f.key]) {
+        updates[f.key] = val;
+      }
+    }
+  });
+  
+  // لا نسمح بتعديل ID
+  // إذا لم يكن هناك أي تغيير
+  if (Object.keys(updates).length === 0) {
+    alert("لم تقم بأي تعديل | No changes made");
+    return;
+  }
+  
+  // تأكيد
+  if (!confirm("هل أنت متأكد من حفظ التعديلات؟")) return;
+  
+  const res = await callApi("updateFamily", { id: currentAdminId, updates: JSON.stringify(updates) });
+  
+  if (res.status === "success") {
+    alert("تم التحديث بنجاح | Updated successfully");
+    // إعادة تحميل نتائج البحث
+    adminSearch();
+    // إخفاء التفاصيل
+    adminCancel();
+  } else {
+    alert("خطأ: " + res.message);
+  }
+}
+
+function adminCancel() {
+  document.getElementById('admin-details').style.display = 'none';
+  currentAdminId = null;
+  currentAdminData = null;
+}
+
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
