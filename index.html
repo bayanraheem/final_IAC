@@ -14,6 +14,9 @@
   --glass: rgba(255, 255, 255, 0.95);
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   --font-base: clamp(13px, 1.2vw, 16px);
+  --accent-yellow: #f39c12;
+  --accent-orange: #e67e22;
+  --accent-gold: #f1c40f;
 }
 * { box-sizing: border-box; }
 body {
@@ -240,10 +243,9 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
   font-size: 13px;
   border: 1px solid var(--iac-primary);
 }
-/* زر حفظ التعديلات متناسق */
+/* زر حفظ التعديلات */
 .admin-save-btn {
-  width: 100%;
-  max-width: 300px;
+  width: 200px;
   margin: 15px auto;
   padding: 12px 20px;
   background: var(--iac-primary);
@@ -256,24 +258,24 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
   text-align: center;
   font-size: 16px;
 }
-/* أنماط تفاصيل المواد في الإحصاء */
-.stats-item-row {
+/* بطاقات تفاصيل المواد - ألوان جديدة */
+.item-row-detail {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: white;
-  padding: 12px 18px;
+  padding: 10px 15px;
   border-radius: 15px;
   margin-bottom: 10px;
-  border-right: 5px solid #f1c40f; /* لون أصفر */
+  border-right: 5px solid var(--accent-gold);
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
-.stats-item-qty {
-  background: #fff3cd;
-  color: #856404;
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
+.item-qty-box-detail {
+  background: #fef5e7;
+  color: var(--accent-orange);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,7 +337,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     
     <!-- الأقسام الإضافية (تظهر فقط للمسؤول) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
-    <div class="sidebar-item" id="stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام | Global Statistics</div>
+    <div class="sidebar-item" id="admin-stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام (تفصيلي)</div>
   </div>
 
   <div class="header-bar">
@@ -441,7 +443,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
       </div>
     </div>
 
-    <!-- قسم الإحصاء العام (للمسؤول فقط) - مع تفاصيل المواد -->
+    <!-- قسم الإحصاء العام (موحد) -->
     <div id="global-stats-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">الإحصاء التراكمي الشامل | Global Analytics</div>
@@ -451,12 +453,13 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
         </div>
       </div>
       <div id="global-days-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
-      <!-- نافذة تفاصيل المواد -->
-      <div id="stats-details" style="display:none; margin-top:15px;">
+      
+      <!-- نافذة تفاصيل المواد (تظهر عند النقر) -->
+      <div id="global-stats-details" style="display:none; margin-top:15px;">
         <div class="panel">
-          <div class="panel-header" id="stats-details-title">تفاصيل المواد</div>
-          <div class="panel-body" id="stats-details-content"></div>
-          <button class="btn-action btn-scan" onclick="document.getElementById('stats-details').style.display='none';">❌ إغلاق</button>
+          <div class="panel-header" id="global-stats-details-title">تفاصيل المواد</div>
+          <div class="panel-body" id="global-stats-details-content"></div>
+          <button class="btn-action btn-scan" onclick="document.getElementById('global-stats-details').style.display='none';">❌ إغلاق</button>
         </div>
       </div>
     </div>
@@ -465,7 +468,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0NWRV_87wTQ3Ej2Zye0zCYNOXLzNlRmC26ZzfEARgBILGl1HyrROkZ8oYn8nahDOhtA/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0NWRV_87wTQ3Ej2Zye0zCYNOXLzNlRmC26ZzfEARgBILGl1HyrROkZ8oYn8nahDOhtA/exec"; // حدّث الرابط
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
@@ -494,7 +497,20 @@ async function callApi(action, params = {}) {
         }
         url.searchParams.append('nocache', Date.now());
         
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        if (!response.ok) {
+            console.error('HTTP error:', response.status);
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        
         const text = await response.text();
         try {
             return JSON.parse(text);
@@ -505,8 +521,8 @@ async function callApi(action, params = {}) {
         }
     } catch (err) {
         console.error("API Error:", err);
-        alert("فشل الاتصال بالخادم. تأكد من جودة الإنترنت.");
-        return { status: "error", message: "Connection failed" };
+        alert("فشل الاتصال بالخادم. قد يكون هناك حظر من إضافة في المتصفح. جرب تعطيل الإضافات مؤقتاً.");
+        return { status: "error", message: "Connection failed: " + err.message };
     }
 }
 
@@ -541,12 +557,12 @@ function login() {
   if(enteredPass === ADMIN_PASS) {
     loginType = "admin";
     document.getElementById('admin-menu-item').style.display = 'block';
-    document.getElementById('stats-menu-item').style.display = 'block';
+    document.getElementById('admin-stats-menu-item').style.display = 'block';
     showMainApp();
   } else if(enteredPass === SYSTEM_PASS) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
-    document.getElementById('stats-menu-item').style.display = 'none';
+    document.getElementById('admin-stats-menu-item').style.display = 'none';
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -577,7 +593,7 @@ async function processVolunteerLogin(scannedId) {
   if(res.status === "success") {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
-    document.getElementById('stats-menu-item').style.display = 'none';
+    document.getElementById('admin-stats-menu-item').style.display = 'none';
     showWelcome(res);
   } else {
     document.getElementById('login-err').innerText = "غير مصرح لك بالدخول | Access Denied";
@@ -603,7 +619,7 @@ function showMainApp() {
   document.getElementById('main-app').style.display = 'flex';
 }
 
-// --- وظائف التوزيع (كما هي) ---
+// --- وظائف التوزيع (بدون تغيير) ---
 async function search() {
   const id = document.getElementById('idInput').value;
   const day = document.getElementById('dayInput').value;
@@ -1085,7 +1101,7 @@ function adminCancel() {
   currentAdminData = null;
 }
 
-// ========== دوال الإحصاء العام (مع تفاصيل المواد) ==========
+// ========== دوال الإحصاء الموحد ==========
 async function loadGlobalStats() {
   const mainStatsDiv = document.getElementById('global-main-stats');
   const daysListDiv = document.getElementById('global-days-list');
@@ -1137,9 +1153,9 @@ async function loadGlobalStats() {
 }
 
 async function showDayItems(day) {
-  const detailsDiv = document.getElementById('stats-details');
-  const title = document.getElementById('stats-details-title');
-  const content = document.getElementById('stats-details-content');
+  const detailsDiv = document.getElementById('global-stats-details');
+  const title = document.getElementById('global-stats-details-title');
+  const content = document.getElementById('global-stats-details-content');
   
   title.innerText = `تفاصيل المواد لليوم | Day ${day}`;
   content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
@@ -1150,9 +1166,9 @@ async function showDayItems(day) {
     let itemsHtml = "";
     for (const [item, qty] of Object.entries(res.items)) {
       itemsHtml += `
-        <div class="stats-item-row">
+        <div class="item-row-detail">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div class="stats-item-qty">${qty}</div>
+            <div class="item-qty-box-detail">${qty}</div>
             <div class="item-info-wrapper">
               <span class="item-name-ar">${getArName(item)}</span>
               <span class="item-name-en">${getEnName(item)}</span>
@@ -1168,9 +1184,9 @@ async function showDayItems(day) {
 }
 
 async function showOverallItems() {
-  const detailsDiv = document.getElementById('stats-details');
-  const title = document.getElementById('stats-details-title');
-  const content = document.getElementById('stats-details-content');
+  const detailsDiv = document.getElementById('global-stats-details');
+  const title = document.getElementById('global-stats-details-title');
+  const content = document.getElementById('global-stats-details-content');
   
   title.innerText = `إجمالي المواد (كل الأيام)`;
   content.innerHTML = `<div style='text-align:center; padding:20px;'>⏳ جاري التحميل...</div>`;
@@ -1181,9 +1197,9 @@ async function showOverallItems() {
     let itemsHtml = "";
     for (const [item, qty] of Object.entries(res.items)) {
       itemsHtml += `
-        <div class="stats-item-row">
+        <div class="item-row-detail">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div class="stats-item-qty">${qty}</div>
+            <div class="item-qty-box-detail">${qty}</div>
             <div class="item-info-wrapper">
               <span class="item-name-ar">${getArName(item)}</span>
               <span class="item-name-en">${getEnName(item)}</span>
