@@ -336,6 +336,8 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <!-- الأقسام الإضافية (تظهر فقط للمسؤول) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
     <div class="sidebar-item" id="stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام | Global Statistics</div>
+    <!-- القسم الجديد: إحصاء المستفيدين -->
+    <div class="sidebar-item" id="beneficiary-stats-menu-item" style="display:none;" onclick="switchSection('beneficiary-stats-sec'); loadBeneficiaryStats();">📋 إحصاء المستفيدين | Beneficiaries Statistics</div>
   </div>
 
   <div class="header-bar">
@@ -441,7 +443,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
       </div>
     </div>
 
-    <!-- قسم الإحصاء العام (للمسؤول فقط) - مع تفاصيل المواد -->
+    <!-- قسم الإحصاء العام (للمسؤول فقط) -->
     <div id="global-stats-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">الإحصاء التراكمي الشامل | Global Analytics</div>
@@ -460,12 +462,24 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
         </div>
       </div>
     </div>
+
+    <!-- القسم الجديد: إحصاء المستفيدين (للمسؤول فقط) -->
+    <div id="beneficiary-stats-sec" class="section-content">
+      <div class="panel">
+        <div class="panel-header">إحصاء المستفيدين | Beneficiaries Statistics</div>
+        <div class="panel-body">
+          <div id="beneficiary-main-stats" class="stats-grid"></div>
+        </div>
+      </div>
+      <div id="pending-beneficiaries-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
+    </div>
+
   </div>
 </div>
 
 <script>
 // ========== إعدادات API ==========
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxjsw_CswSfNvAuLZK3DP2uXn9rG9KDrz8JdGnqgCI0KOCkNo2xfYoPAE83nlY2tmwRNQ/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz2NGEKdm0kNQpcTtses9nH35Nci4jTiC5gzbGwC-plGgqt7JrWiGrn1YS-J2OPkIehJw/exec"; // حدّث الرابط بعد نشر النسخة الجديدة
 
 const SYSTEM_PASS = "iac2026";
 const ADMIN_PASS = "1222003";
@@ -542,11 +556,13 @@ function login() {
     loginType = "admin";
     document.getElementById('admin-menu-item').style.display = 'block';
     document.getElementById('stats-menu-item').style.display = 'block';
+    document.getElementById('beneficiary-stats-menu-item').style.display = 'block'; // إظهار القسم الجديد
     showMainApp();
   } else if(enteredPass === SYSTEM_PASS) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
     document.getElementById('stats-menu-item').style.display = 'none';
+    document.getElementById('beneficiary-stats-menu-item').style.display = 'none'; // إخفاء القسم الجديد
     showMainApp();
   } else {
     document.getElementById('login-err').innerText = "كلمة المرور خاطئة | Incorrect Password";
@@ -578,6 +594,7 @@ async function processVolunteerLogin(scannedId) {
     loginType = "normal";
     document.getElementById('admin-menu-item').style.display = 'none';
     document.getElementById('stats-menu-item').style.display = 'none';
+    document.getElementById('beneficiary-stats-menu-item').style.display = 'none'; // إخفاء القسم الجديد
     showWelcome(res);
   } else {
     document.getElementById('login-err').innerText = "غير مصرح لك بالدخول | Access Denied";
@@ -1197,36 +1214,54 @@ async function showOverallItems() {
     content.innerHTML = `<div style='color:red;'>خطأ: ${res.message}</div>`;
   }
 }
+
+// ========== دالة القسم الجديد: إحصاء المستفيدين ==========
+async function loadBeneficiaryStats() {
+  const mainStatsDiv = document.getElementById('beneficiary-main-stats');
+  const pendingDiv = document.getElementById('pending-beneficiaries-list');
+  
+  mainStatsDiv.innerHTML = "<div style='grid-column: span 3; padding:20px; text-align:center;'>⏳ جاري تحميل الإحصاء...</div>";
+  pendingDiv.innerHTML = "";
+
+  const res = await callApi("getBeneficiaryStats", {});
+  if (res.status === "success") {
+    mainStatsDiv.innerHTML = `
+      <div class="stat-card" style="border-bottom: 5px solid var(--iac-primary);">
+        <span class="stat-val">${res.total}</span>
+        <span class="stat-lbl">إجمالي المستفيدين<br>Total Beneficiaries</span>
+      </div>
+      <div class="stat-card" style="border-bottom: 5px solid #2ecc71;">
+        <span class="stat-val" style="color:#2ecc71;">${res.received}</span>
+        <span class="stat-lbl">تم الاستلام<br>Received</span>
+      </div>
+      <div class="stat-card" style="border-bottom: 5px solid #e74c3c;">
+        <span class="stat-val" style="color:#e74c3c;">${res.pending}</span>
+        <span class="stat-lbl">لم يستلموا<br>Pending</span>
+      </div>
+    `;
+
+    if (res.pendingList.length === 0) {
+      pendingDiv.innerHTML = "<div class='status-card' style='text-align:center;'>جميع المستفيدين استلموا مخصصاتهم | All beneficiaries have received</div>";
+    } else {
+      let html = "<div class='panel'><div class='panel-header'>المستفيدون الذين لم يستلموا بعد | Pending Beneficiaries</div><div class='panel-body' style='max-height: 400px; overflow-y: auto;'>";
+      res.pendingList.forEach(item => {
+        html += `
+          <div class="admin-card" style="margin-bottom: 10px; cursor:default;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+              <div><span style="font-weight:800; color:var(--iac-primary);">${item.id}</span></div>
+              <div><span style="font-weight:700;">${item.name || '—'}</span></div>
+              <div><span style="color:#7f8c8d;">📞 ${item.phone || '—'}</span></div>
+            </div>
+          </div>
+        `;
+      });
+      html += "</div></div>";
+      pendingDiv.innerHTML = html;
+    }
+  } else {
+    mainStatsDiv.innerHTML = `<div style='grid-column: span 3; color:red;'>خطأ: ${res.message}</div>`;
+  }
+}
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
