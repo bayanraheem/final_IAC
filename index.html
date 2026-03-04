@@ -464,21 +464,21 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     </div>
 
     <!-- القسم الجديد: إحصاء المستفيدين (للمسؤول فقط) -->
-    <div id="beneficiary-stats-sec" class="section-content">
-      <div class="panel">
-        <div class="panel-header">إحصاء المستفيدين | Beneficiaries Statistics</div>
-        <div class="panel-body">
-          <div id="beneficiary-main-stats" class="stats-grid"></div>
-        </div>
-      </div>
-      <div id="pending-beneficiaries-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
-      <!-- زر التصدير -->
-      <div style="width: 100%; max-width: 600px; margin: 10px auto; text-align: left;">
-        <button class="btn-action btn-search" onclick="exportPendingToCSV()" style="width: auto; padding: 10px 20px; display: inline-block;">
-          📥 تصدير إلى Excel (CSV)
-        </button>
-      </div>
+<div id="beneficiary-stats-sec" class="section-content">
+  <div class="panel">
+    <div class="panel-header">إحصاء المستفيدين | Beneficiaries Statistics</div>
+    <div class="panel-body">
+      <div id="beneficiary-main-stats" class="stats-grid"></div>
     </div>
+  </div>
+  <div id="pending-beneficiaries-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
+  <!-- زر التصدير -->
+  <div style="width: 100%; max-width: 600px; margin: 10px auto; text-align: left;">
+    <button class="btn-action btn-search" onclick="exportPendingToCSV()" style="width: auto; padding: 10px 20px; display: inline-block;">
+      📥 تصدير إلى Excel (CSV)
+    </button>
+  </div>
+</div>
 
   </div>
 </div>
@@ -1222,6 +1222,7 @@ async function showOverallItems() {
 }
 
 // ========== دالة القسم الجديد: إحصاء المستفيدين ==========
+// ========== دالة القسم الجديد: إحصاء المستفيدين ==========
 // متغير عام لتخزين قائمة المستفيدين غير المستلمين للتصدير
 window.pendingBeneficiariesData = [];
 
@@ -1234,8 +1235,9 @@ async function loadBeneficiaryStats() {
 
   const res = await callApi("getBeneficiaryStats", {});
   if (res.status === "success") {
-    // حفظ البيانات للتصدير
-    window.pendingBeneficiariesData = res.pendingList || [];
+    // حفظ البيانات للتصدير (مع التأكد من أنها مصفوفة)
+    window.pendingBeneficiariesData = Array.isArray(res.pendingList) ? res.pendingList : [];
+    console.log('✅ تم تخزين بيانات التصدير:', window.pendingBeneficiariesData); // للتحقق
 
     mainStatsDiv.innerHTML = `
       <div class="stat-card" style="border-bottom: 5px solid var(--iac-primary);">
@@ -1278,22 +1280,24 @@ async function loadBeneficiaryStats() {
 // دالة تصدير البيانات إلى CSV
 function exportPendingToCSV() {
   const data = window.pendingBeneficiariesData;
+  console.log('📤 محاولة تصدير البيانات:', data); // للتحقق
+
   if (!data || data.length === 0) {
-    alert("لا توجد بيانات للتصدير");
+    alert("⚠️ لا توجد بيانات للتصدير. تأكد من تحميل القائمة أولاً.");
     return;
   }
 
   // إنشاء محتوى CSV
   const headers = ["ID", "الاسم", "رقم الهاتف"];
   const rows = data.map(item => [
-    item.id,
+    item.id || '',
     item.name || '',
     item.phone || ''
   ]);
 
   let csvContent = headers.join(',') + '\n';
   rows.forEach(row => {
-    // هرب أي فواصل داخل النصوص
+    // هرب أي فواصل أو علامات اقتباس داخل النصوص
     const escapedRow = row.map(cell => {
       if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))) {
         return `"${cell.replace(/"/g, '""')}"`;
@@ -1313,7 +1317,10 @@ function exportPendingToCSV() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+
+  console.log('✅ تم تحميل الملف بنجاح');
 }
 </script>
 </body>
 </html>
+
