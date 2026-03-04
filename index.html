@@ -336,9 +336,23 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <!-- الأقسام الإضافية (تظهر فقط للمسؤول) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
     <div class="sidebar-item" id="stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام | Global Statistics</div>
-    <!-- القسم الجديد: إحصاء المستفيدين -->
-    <div class="sidebar-item" id="beneficiary-stats-menu-item" style="display:none;" onclick="switchSection('beneficiary-stats-sec'); loadBeneficiaryStats();">📋 إحصاء المستفيدين | Beneficiaries Statistics</div>
-  </div>
+ 
+    <!-- القسم الجديد: إحصاء المستفيدين (للمسؤول فقط) -->
+    <div id="beneficiary-stats-sec" class="section-content">
+      <div class="panel">
+        <div class="panel-header">إحصاء المستفيدين | Beneficiaries Statistics</div>
+        <div class="panel-body">
+          <div id="beneficiary-main-stats" class="stats-grid"></div>
+        </div>
+      </div>
+      <div id="pending-beneficiaries-list" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
+      <!-- زر التصدير -->
+      <div style="width: 100%; max-width: 600px; margin: 10px auto; text-align: left;">
+        <button class="btn-action btn-search" onclick="exportPendingToCSV()" style="width: auto; padding: 10px 20px; display: inline-block;">
+          📥 تصدير إلى Excel (CSV)
+        </button>
+      </div>
+    </div>
 
   <div class="header-bar">
     <div class="header-logo-container">
@@ -1215,6 +1229,7 @@ async function showOverallItems() {
   }
 }
 
+window.pendingBeneficiariesData = [];    
 // ========== دالة القسم الجديد: إحصاء المستفيدين ==========
 async function loadBeneficiaryStats() {
   const mainStatsDiv = document.getElementById('beneficiary-main-stats');
@@ -1262,6 +1277,45 @@ async function loadBeneficiaryStats() {
     mainStatsDiv.innerHTML = `<div style='grid-column: span 3; color:red;'>خطأ: ${res.message}</div>`;
   }
 }
+function exportPendingToCSV() {
+  const data = window.pendingBeneficiariesData;
+  if (!data || data.length === 0) {
+    alert("لا توجد بيانات للتصدير");
+    return;
+  }
+
+  // إنشاء محتوى CSV
+  const headers = ["ID", "الاسم", "رقم الهاتف"];
+  const rows = data.map(item => [
+    item.id,
+    item.name || '',
+    item.phone || ''
+  ]);
+
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    // هرب أي فواصل داخل النصوص
+    const escapedRow = row.map(cell => {
+      if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))) {
+        return `"${cell.replace(/"/g, '""')}"`;
+      }
+      return cell;
+    }).join(',');
+    csvContent += escapedRow + '\n';
+  });
+
+  // إنشاء رابط التحميل
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // إضافة BOM لدعم العربية
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.setAttribute('download', 'pending_beneficiaries.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}    
 </script>
 </body>
 </html>
+
