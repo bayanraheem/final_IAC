@@ -336,7 +336,7 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     <!-- الأقسام الإضافية (تظهر فقط للمسؤول) -->
     <div class="sidebar-item" id="admin-menu-item" style="display:none;" onclick="switchSection('admin-sec')">🔐 إدارة العائلات | Families Management</div>
     <div class="sidebar-item" id="stats-menu-item" style="display:none;" onclick="switchSection('global-stats-sec'); loadGlobalStats();">📊 إحصاء عام | Global Statistics</div>
- 
+    <div class="sidebar-item" id="beneficiary-stats-menu-item" style="display:none;" onclick="switchSection('beneficiary-stats-sec'); loadBeneficiaryStats();">📋 إحصاء المستفيدين | Beneficiaries Statistics</div></div>
     <!-- القسم الجديد: إحصاء المستفيدين (للمسؤول فقط) -->
     <div id="beneficiary-stats-sec" class="section-content">
       <div class="panel">
@@ -478,8 +478,6 @@ input { width: 100%; padding: 12px; border: 2px solid #d1dbd6; border-radius: 12
     </div>
 
     <!-- القسم الجديد: إحصاء المستفيدين (للمسؤول فقط) -->
-<div class="sidebar-item" id="beneficiary-stats-menu-item" style="display:none;" onclick="switchSection('beneficiary-stats-sec'); loadBeneficiaryStats();">📋 إحصاء المستفيدين | Beneficiaries Statistics</div>
-  </div>
     <div id="beneficiary-stats-sec" class="section-content">
       <div class="panel">
         <div class="panel-header">إحصاء المستفيدين | Beneficiaries Statistics</div>
@@ -1320,5 +1318,6 @@ function exportPendingToCSV() {
 </script>
 </body>
 </html>
+
 
 
